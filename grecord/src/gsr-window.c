@@ -43,9 +43,9 @@
 #include <gtk/gtk.h>
 #include <gconf/gconf-client.h>
 #include <gst/gst.h>
-#include <gst/interfaces/mixer.h>
+#include <gst/gstpad.h>
 
-#include <libgnome-media-profiles/gnome-media-profiles.h>
+#include <gst/pbutils/encoding-profile.h>
 
 #include "gsr-window.h"
 
@@ -59,11 +59,6 @@ extern GConfClient *gconf_client;
 
 extern void gsr_add_recent (gchar *filename);
 
-#define GCONF_DIR           "/apps/gnome-sound-recorder/"
-#define KEY_OPEN_DIR        GCONF_DIR "system-state/open-file-directory"
-#define KEY_SAVE_DIR        GCONF_DIR "system-state/save-file-directory"
-#define KEY_LAST_PROFILE_ID GCONF_DIR "last-profile-id"
-#define KEY_LAST_INPUT      GCONF_DIR "last-input"
 #define EBUSY_TRY_AGAIN     3    /* Empirical data */
 
 typedef struct _GSRWindowPipeline {
@@ -73,6 +68,7 @@ typedef struct _GSRWindowPipeline {
 
 	GstElement *src;
 	GstElement *sink;
+	GstElement *encodebin;
 
 	guint       tick_id;
 } GSRWindowPipeline;
@@ -148,7 +144,6 @@ struct _GSRWindowPrivate {
 	GstElement *source;
 };
 
-static gboolean            make_record_source      (GSRWindow         *window);
 static GSRWindowPipeline * make_record_pipeline    (GSRWindow         *window);
 static GSRWindowPipeline * make_play_pipeline      (GSRWindow         *window);
 
@@ -184,31 +179,6 @@ show_error_dialog (GtkWindow *win, const gchar *dbg, const gchar * format, ...)
 	g_free (s);
 }
 
-static void
-show_missing_known_element_error (GtkWindow *win, gchar *description,
-	gchar *element, gchar *plugin, gchar *module)
-{
-	show_error_dialog (win, NULL,
-            _("Could not create the GStreamer %s element.\n"
-	      "Please install the '%s' plugin from the '%s' module.\n"
-	      "Verify that the installation is correct by running\n"
-              "    gst-inspect-0.10 %s\n"
-	      "and then restart gnome-sound-recorder."),
-            description, plugin, module, element);
-}
-
-static void
-show_profile_error (GtkWindow *win, gchar *debug, gchar *description,
-	const char *profile)
-{
-	gchar *first;
-
-	first = g_strdup_printf (description, profile);
-	show_error_dialog (win, debug, "%s%s", first,
-		  _("Please verify its settings.\n"
-		    "You may be missing the necessary plugins."));
-	g_free (first);
-}
 /* Why do we need this? when a bin changes from READY => NULL state, its
  * bus is set to flushing and we're unlikely to ever see any of its messages
  * if the bin's state reaches NULL before we/the watch in the main thread
@@ -361,8 +331,6 @@ file_open_cb (GtkAction *action,
 	      GSRWindow *window)
 {
 	GtkWidget *file_chooser;
-	gchar *directory;
-	gchar *locale_directory = NULL;
 	gint response;
 
 	g_return_if_fail (GSR_IS_WINDOW (window));
@@ -374,17 +342,6 @@ file_open_cb (GtkAction *action,
 						    GTK_STOCK_OPEN, GTK_RESPONSE_OK,
 						    NULL);
 
-	directory = gconf_client_get_string (gconf_client, KEY_OPEN_DIR, NULL);
-
-	if (directory != NULL && *directory != 0) {
-		locale_directory = g_filename_from_utf8 (directory, -1, NULL, NULL, NULL);
-		if (!locale_directory || !g_file_test (locale_directory, G_FILE_TEST_EXISTS))
-			locale_directory = g_strdup (directory);
-		gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (file_chooser),
-		                                     locale_directory);
-		g_free (locale_directory);
-	}
-
 	response = gtk_dialog_run (GTK_DIALOG (file_chooser));
 
 	if (response == GTK_RESPONSE_OK) {
@@ -393,12 +350,7 @@ file_open_cb (GtkAction *action,
 
 		name = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_chooser));
 		if (name) {
-			gchar *dirname;
-
 			utf8_name = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-			dirname = g_path_get_dirname (utf8_name);
-			gconf_client_set_string (gconf_client, KEY_OPEN_DIR, dirname, NULL);
-			g_free (dirname);
 			g_free (utf8_name);
 
 			if (window->priv->has_file == TRUE) {
@@ -415,7 +367,6 @@ file_open_cb (GtkAction *action,
     }
 
 	gtk_widget_destroy (file_chooser);
-	g_free (directory);
 }
 
 static void
@@ -469,31 +420,6 @@ file_open_recent_cb (GtkRecentChooser *chooser,
 	g_free (filename);
 	g_free (uri);
 }
-
-#if 0
-static gboolean
-cb_iterate (GstBin  *bin,
-	    gpointer data)
-{
-	src = gst_element_get_child (bin, "sink");
-	sink = gst_element_get_child (bin, "sink");
-	
-	if (src && sink) {
-		gint64 pos, tot, enc;
-		GstFormat fmt = GST_FORMAT_BYTES;
-
-		gst_element_query (src, GST_QUERY_POSITION, &fmt, &pos);
-		gst_element_query (src, GST_QUERY_TOTAL, &fmt, &tot);
-		gst_element_query (sink, GST_QUERY_POSITION, &fmt, &enc);
-
-		g_print ("Iterate: %lld/%lld -> %lld\n", pos, tot, enc);
-	} else
-		g_print ("Iterate ?\n");
-
-	/* we don't do anything here */
-	return FALSE;
-}
-#endif
 
 static gboolean
 handle_ebusy_error (GSRWindow *window)
@@ -722,8 +648,6 @@ file_save_as_cb (GtkAction *action,
 		 GSRWindow *window)
 {
 	GtkWidget *file_chooser;
-	gchar *directory;
-	gchar *locale_directory = NULL;
 	gint response;
 
 	g_return_if_fail (GSR_IS_WINDOW (window));
@@ -734,16 +658,6 @@ file_save_as_cb (GtkAction *action,
 						    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
 						    GTK_STOCK_SAVE, GTK_RESPONSE_OK,
 						    NULL);
-
-	directory = gconf_client_get_string (gconf_client, KEY_SAVE_DIR, NULL);
-	if (directory != NULL && *directory != 0) {
-		locale_directory = g_filename_from_utf8 (directory, -1, NULL, NULL, NULL);
-		if (!locale_directory || !g_file_test (locale_directory, G_FILE_TEST_EXISTS))
-			locale_directory = g_strdup (directory);
-		gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (file_chooser), locale_directory);
-		g_free (locale_directory);
-	}
-	g_free (directory);
 
 	if (window->priv->filename != NULL) {
 		char *locale_basename;
@@ -778,18 +692,9 @@ file_save_as_cb (GtkAction *action,
 
 	if (response == GTK_RESPONSE_OK) {
 		gchar *name;
-		gchar *utf8_name = NULL;
 
 		name = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_chooser));
 		if (name) {
-			gchar *dirname;
-
-			utf8_name= g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-			dirname = g_path_get_dirname (utf8_name);
-			gconf_client_set_string (gconf_client, KEY_SAVE_DIR, dirname, NULL);
-			g_free (dirname);
-			g_free (utf8_name);
-	
 			do_save_file (window, name);
 			g_free (name);
 	    }
@@ -1306,15 +1211,15 @@ record_cb (GtkAction *action,
 
 	GSRWindowPrivate *priv = window->priv;
 
-	if (priv->record) {
+	if (priv->record)
 		shutdown_pipeline (priv->record);
-		if (!make_record_source (window))
-			return;
-	}
 
 	if ((priv->record = make_record_pipeline (window))) {
-		window->priv->len_secs = 0;
-		window->priv->saved = FALSE;
+		priv->len_secs = 0;
+		priv->saved = FALSE;
+
+		if (priv->filename)
+			g_free (priv->filename);
 
 		g_print ("%s", priv->record_filename);
 		g_object_set (G_OBJECT (priv->record->sink),
@@ -1382,7 +1287,7 @@ play_tick_callback (GSRWindow *window)
 		return FALSE;
 	}
 
-	if (gst_element_query_duration (playbin, &format, &val) && val != -1) {
+	if (gst_element_query_duration (playbin, format, &val) && val != -1) {
 		gchar *len_str;
 
 		window->priv->len_secs = val / GST_SECOND;
@@ -1410,7 +1315,7 @@ play_tick_callback (GSRWindow *window)
 		return TRUE;
 	}
 
-	if (gst_element_query_position (playbin, &format, &val) && val != -1) {
+	if (gst_element_query_position (playbin, format, &val) && val != -1) {
 		gdouble pos, len, percentage;
 
 		pos = (gdouble) (val - (val % GST_SECOND));
@@ -1446,7 +1351,7 @@ record_tick_callback (GSRWindow *window)
 
 	pipeline = window->priv->record->pipeline;
 
-	if (gst_element_query_position (pipeline, &format, &val) && val != -1) {
+	if (gst_element_query_position (pipeline, format, &val) && val != -1) {
 		gchar* len_str;
 
 		secs = val / GST_SECOND;
@@ -1570,17 +1475,17 @@ pipeline_deep_notify_caps_cb (GstObject  *pipeline,
 			    (strstr (klass, "Decoder") || strstr (klass, "Encoder"))) {
 				GstCaps *caps;
 
-				caps = gst_pad_get_negotiated_caps (GST_PAD_CAST (object));
+				caps = gst_pad_get_current_caps (GST_PAD_CAST (object));
 				if (caps) {
 					GstStructure *s;
 					gint val;
 
 					s = gst_caps_get_structure (caps, 0);
 					if (gst_structure_get_int (s, "channels", &val)) {
-						gst_atomic_int_set (&priv->atomic.n_channels, val);
+						g_atomic_int_set (&priv->atomic.n_channels, val);
 					}
 					if (gst_structure_get_int (s, "rate", &val)) {
-						gst_atomic_int_set (&priv->atomic.samplerate, val);
+						g_atomic_int_set (&priv->atomic.samplerate, val);
 					}
 					gst_caps_unref (caps);
 				}
@@ -1588,25 +1493,6 @@ pipeline_deep_notify_caps_cb (GstObject  *pipeline,
 		}
 		if (pad_parent)
 			gst_object_unref (pad_parent);
-	}
-}
-
-/* callback for when the recording profile has been changed */
-static void
-profile_changed_cb (GObject *object, GSRWindow *window)
-{
-	GMAudioProfile *profile;
-	gchar *id;
-
-	g_return_if_fail (GTK_IS_COMBO_BOX (object));
-
-	profile = gm_audio_profile_choose_get_active (GTK_WIDGET (object));
-
-	if (profile != NULL) {
-		id = g_strdup (gm_audio_profile_get_id (profile));
-		GST_DEBUG ("profile changed to %s", GST_STR_NULL (id));
-		gconf_client_set_string (gconf_client, KEY_LAST_PROFILE_ID, id, NULL);
-		g_free (id);
 	}
 }
 
@@ -1627,22 +1513,11 @@ make_play_pipeline (GSRWindow *window)
 	GstElement *playbin;
 	GstElement *audiosink;
 
-	audiosink = gst_element_factory_make ("gconfaudiosink", "sink");
-	if (audiosink == NULL) {
-		show_missing_known_element_error (NULL,
-		    _("GConf audio output"), "gconfaudiosink", "gconfelements",
-		    "gst-plugins-good");
-		return NULL;
-	}
+	audiosink = gst_element_factory_make ("pulsesink", NULL);
+	g_return_val_if_fail (audiosink != NULL, NULL);
 
-	playbin = gst_element_factory_make ("playbin", "playbin");
-	if (playbin == NULL) {
-		gst_object_unref (audiosink);
-		show_missing_known_element_error (NULL,
-		    _("Playback"), "playbin", "playback",
-		    "gst-plugins-base");
-		return NULL;
-	}
+	playbin = gst_element_factory_make ("playbin", NULL);
+	g_return_val_if_fail (playbin != NULL, NULL);
 
 	obj = g_new0 (GSRWindowPipeline, 1);
 	obj->pipeline = playbin;
@@ -1751,7 +1626,6 @@ static void
 record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 {
 	GstState  new_state;
-	GMAudioProfile *profile;
 
 	gst_message_parse_state_changed (msg, NULL, &new_state, NULL);
 
@@ -1769,15 +1643,10 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 	case GST_STATE_PLAYING:
 		window->priv->record_id = g_idle_add (record_start, window);
 		g_free (window->priv->extension);
-		profile = gm_audio_profile_choose_get_active (window->priv->profile);
-		window->priv->extension = g_strdup (profile ? gm_audio_profile_get_extension (profile) : NULL);
-		gtk_widget_set_sensitive (window->priv->profile, FALSE);
-		gtk_widget_set_sensitive (window->priv->input, FALSE);
 		break;
 	case GST_STATE_READY:
 		gtk_adjustment_set_value (gtk_range_get_adjustment (GTK_RANGE (window->priv->scale)), 0.0);
 		gtk_widget_set_sensitive (window->priv->scale, FALSE);
-		gtk_widget_set_sensitive (window->priv->profile, TRUE);
 		/* fall through */
 	case GST_STATE_PAUSED:
 		set_action_sensitive (window, "Stop", FALSE);
@@ -1786,8 +1655,6 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 		set_action_sensitive (window, "FileSave", TRUE);
 		set_action_sensitive (window, "FileSaveAs", TRUE);
 		gtk_widget_set_sensitive (window->priv->scale, FALSE);
-		gtk_widget_set_sensitive (window->priv->profile, TRUE);
-		gtk_widget_set_sensitive (window->priv->input, TRUE);
 
 		gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
 				   window->priv->status_message_cid);
@@ -1804,36 +1671,6 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 	}
 }
 
-/* create the gconf-based source for recording.
- * store the source and the mixer in it in our window-private data
- */
-static gboolean
-make_record_source (GSRWindow *window)
-{
-	GstElement *source;
-
-	source = gst_element_factory_make ("gconfaudiosrc", "gconfaudiosource");
-	if (source == NULL) {
-		show_missing_known_element_error (NULL,
-		    _("GConf audio recording"), "gconfaudiosrc",
-		    "gconfelements", "gst-plugins-good");
-		return FALSE;
-	}
-
-	/* instantiate the underlying element so we can query it */
-	/* FIXME: maybe we want to trap errors in this case ? */
-        if (!gst_element_set_state (source, GST_STATE_READY)) {
-		show_error_dialog (NULL, NULL,
-			_("Your audio capture settings are invalid. "
-			  "Please correct them with the \"Sound Preferences\" "
-			  "under the System Preferences menu."));
-		return FALSE;
-	}
-	window->priv->source = source;
-
-	return TRUE;
-}
-
 static gboolean
 level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
 {
@@ -1847,19 +1684,23 @@ level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
       gint channels;
       gdouble peak_dB;
       gdouble myind;
-      const GValue *list;
+      const GValue *array_val;
+      const GValueArray *array;
       const GValue *value;
+
 
       gint i;
       /* we can get the number of channels as the length of any of the value
        * lists */
 
-      list = gst_structure_get_value (s, "rms");
-      channels = gst_value_list_get_size (list);
+      array_val = gst_structure_get_value (s, "peak");
+      array = (GValueArray *) g_value_get_boxed (array_val);
+      channels = array->n_values;
 
       for (i = 0; i < channels; ++i) {
-	list = gst_structure_get_value (s, "peak");
-        value = gst_value_list_get_value (list, i);
+        array_val = gst_structure_get_value (s, "peak");
+        array = (GValueArray *) g_value_get_boxed (array_val);
+        value = g_value_array_get_nth (array, i);
         peak_dB = g_value_get_double (value);
 	myind = exp (peak_dB / 20);
 	if (myind > 1.0)
@@ -1873,29 +1714,41 @@ level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
   return TRUE;
 }
 
+static GstEncodingProfile *
+gsr_profile_get (void)
+{
+	GstCaps *ogg, *vorbis;
+	GstEncodingAudioProfile *a_prof;
+	GstEncodingContainerProfile *prof;
+	gint ret;
+
+	ogg = gst_caps_new_empty_simple ("application/ogg");
+	prof = gst_encoding_container_profile_new (NULL, NULL, ogg, NULL);
+	gst_caps_unref (ogg);
+
+	vorbis = gst_caps_new_empty_simple ("audio/x-vorbis");
+	a_prof = gst_encoding_audio_profile_new (vorbis, NULL, NULL, 1);
+	gst_caps_unref (vorbis);
+
+	ret = gst_encoding_container_profile_add_profile (prof,
+		(GstEncodingProfile *) a_prof);
+	g_return_val_if_fail(ret, NULL);
+
+	return (GstEncodingProfile *) prof;
+}
+
 static GSRWindowPipeline *
 make_record_pipeline (GSRWindow *window)
 {
 	GSRWindowPipeline *pipeline;
-	GMAudioProfile *profile;
-	const gchar *profile_pipeline_desc;
-	GstElement *encoder, *source, *filesink, *level;
-	GError *err = NULL;
-	gchar *pipeline_desc;
-	const char *name;
+	GstElement *source, *level, *encodebin, *filesink;
 
-	source = window->priv->source;
+	source = gst_element_factory_make ("pulsesrc", NULL);
+	g_return_val_if_fail (source != NULL, NULL);
 
 	/* Any reason we are not using gnomevfssink here? (tpm) */
-	filesink = gst_element_factory_make ("filesink", "sink");
-	if (filesink == NULL)
-	{
-		show_missing_known_element_error (NULL,
-		    _("file output"), "filesink", "coreelements",
-		    "gstreamer");
-		gst_object_unref (source);
-		return NULL;
-	}
+	filesink = gst_element_factory_make ("filesink", NULL);
+	g_return_val_if_fail (filesink != NULL, NULL);
 
 	pipeline = g_new (GSRWindowPipeline, 1);
 
@@ -1903,70 +1756,25 @@ make_record_pipeline (GSRWindow *window)
 	pipeline->src = source;
 	pipeline->sink = filesink;
 
-	gst_bin_add (GST_BIN (pipeline->pipeline), source);
-
+	/* this element should have clearly defined name,
+	 * this is why we set it here with faktory_make */
 	level = gst_element_factory_make ("level", "level");
-	if (level == NULL)
-	{
-		show_missing_known_element_error (NULL,
-		    _("level"), "level", "level",
-		    "gstreamer");
-		gst_object_unref (source);
-		return NULL;
-	}
-	gst_element_set_name (level, "level");
+	g_return_val_if_fail (level != NULL, NULL);
 
-	profile = gm_audio_profile_choose_get_active (window->priv->profile);
-	if (profile == NULL)
-		return NULL;
-	profile_pipeline_desc = gm_audio_profile_get_pipeline (profile);
-	name = gm_audio_profile_get_name (profile);
+	encodebin = gst_element_factory_make ("encodebin", NULL);
+	g_return_val_if_fail (encodebin != NULL, NULL);
 
-	GST_DEBUG ("encoder profile pipeline: '%s'",
-		GST_STR_NULL (profile_pipeline_desc));
+	g_object_set (encodebin, "profile", gsr_profile_get(), NULL);
+	g_object_set (encodebin, "queue-time-max", 120 * GST_SECOND, NULL);
 
-	pipeline_desc = g_strdup_printf ("audioconvert ! %s", profile_pipeline_desc);
-	GST_DEBUG ("making encoder bin from description '%s'", pipeline_desc);
-	encoder = gst_parse_bin_from_description (pipeline_desc, TRUE, &err);
-	g_free (pipeline_desc);
-	pipeline_desc = NULL;
+	gst_bin_add_many (GST_BIN (pipeline->pipeline), source, level,
+			  encodebin, filesink, NULL);
 
-	if (err) {
-		show_profile_error (NULL, err->message,
-			_("Could not parse the '%s' audio profile. "), name);
-		g_printerr ("Failed to create GStreamer encoder plugins [%s]: %s\n",
-		           profile_pipeline_desc, err->message);
-		g_error_free (err);
-		gst_object_unref (pipeline->pipeline);
-		gst_object_unref (filesink);
-		g_free (pipeline);
-		return NULL;
-	}
+	if (!gst_element_link_many (source, level, encodebin, filesink, NULL))
+		g_return_val_if_reached (NULL);
 
-	gst_bin_add (GST_BIN (pipeline->pipeline), level);
-	gst_bin_add (GST_BIN (pipeline->pipeline), encoder);
-	gst_bin_add (GST_BIN (pipeline->pipeline), filesink);
-
-	/* now link it all together */
-	if (!(gst_element_link_many (source, level, encoder, NULL))) {
-		show_profile_error (NULL, NULL,
-			_("Could not capture using the '%s' audio profile. "),
-			name);
-		gst_object_unref (pipeline->pipeline);
-		g_free (pipeline);
-		return NULL;
-	}
-
-	if (!gst_element_link (encoder, filesink)) {
-		show_profile_error (NULL, NULL,
-			_("Could not write to a file using the '%s' audio profile. "),
-			name);
-		gst_object_unref (pipeline->pipeline);
-		g_free (pipeline);
-		return NULL;
-	}
-
-	/* we ultimately want to find out the caps on the encoder's source pad */
+	/* We ultimately want to find out the caps on the
+	 * encoder's source pad */
 	g_signal_connect (pipeline->pipeline, "deep-notify::caps",
 	                  G_CALLBACK (pipeline_deep_notify_caps_cb),
 	                  window);
@@ -2128,9 +1936,6 @@ gsr_window_init (GSRWindow *window)
 	GError *error = NULL;
 	GtkWidget *main_vbox;
 	GtkWidget *menubar;
-	GtkWidget *file_menu;
-	GtkWidget *submenu;
-	GtkWidget *rec_menu;
 	GtkWidget *toolbar;
 	GtkWidget *content_vbox;
 	GtkWidget *hbox;
@@ -2138,8 +1943,6 @@ gsr_window_init (GSRWindow *window)
 	GtkWidget *table;
 	GtkWidget *align;
 	GtkWidget *frame;
-	gchar *id;
-	gchar *last_input;
 	gchar *path;
 	GtkAction *action;
 	GtkShadowType shadow_type;
@@ -2210,12 +2013,6 @@ gsr_window_init (GSRWindow *window)
 	gtk_box_pack_start (GTK_BOX (main_vbox), toolbar, FALSE, FALSE, 0);
 	gtk_widget_show (toolbar);
 
-	/* recent files */
-	file_menu = gtk_ui_manager_get_widget (priv->ui_manager,
-					      "/MenuBar/FileMenu");
-	submenu = gtk_menu_item_get_submenu (GTK_MENU_ITEM (file_menu));
-	rec_menu = gtk_ui_manager_get_widget (priv->ui_manager,
-					      "/MenuBar/FileMenu/FileRecentMenu");
 	priv->recent_view = gtk_recent_chooser_menu_new ();
 	gtk_recent_chooser_set_local_only (GTK_RECENT_CHOOSER (priv->recent_view), TRUE);
 	gtk_recent_chooser_set_limit (GTK_RECENT_CHOOSER (priv->recent_view), 5);
@@ -2246,32 +2043,6 @@ gsr_window_init (GSRWindow *window)
 	gtk_widget_set_sensitive (window->priv->scale, FALSE);
 	gtk_box_pack_start (GTK_BOX (content_vbox), priv->scale, FALSE, FALSE, 6);
 	gtk_widget_show (window->priv->scale);
-
-	/* choose profile */
-	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 12);
-	gtk_box_pack_start (GTK_BOX (content_vbox), hbox, FALSE, FALSE, 0);
-
-	label = gtk_label_new_with_mnemonic (_("_Record as:"));
-	gtk_misc_set_alignment (GTK_MISC (label), 0, 0.5);
-	gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
-
-	priv->profile = gm_audio_profile_choose_new ();
-	gtk_label_set_mnemonic_widget (GTK_LABEL (label), priv->profile);
-	gtk_box_pack_start (GTK_BOX (hbox), window->priv->profile, TRUE, TRUE, 0);
-	gtk_widget_show (window->priv->profile);
-
-	atk_object_add_relationship (gtk_widget_get_accessible (GTK_WIDGET (priv->profile)),
-				ATK_RELATION_LABELLED_BY,
-				gtk_widget_get_accessible (GTK_WIDGET (label)));
-
-	id = gconf_client_get_string (gconf_client, KEY_LAST_PROFILE_ID, NULL);
-	if (id) {
-		gm_audio_profile_choose_set_active (window->priv->profile, id);
-		g_free (id);
-	}
-
-        g_signal_connect (priv->profile, "changed",
-                          G_CALLBACK (profile_changed_cb), window);
 
 	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
 	gtk_box_pack_start (GTK_BOX (content_vbox), hbox, FALSE, FALSE, 0);

@@ -103,8 +103,8 @@ have_gst=no
 PKG_CHECK_MODULES(GSR, [
   gstreamer-$GST_MAJORMINOR >= $GST_REQ
   gstreamer-plugins-base-$GST_MAJORMINOR >= $GST_REQ
-  libgnome-media-profiles-3.0
   gtk+-3.0 >= 2.6.0
+  gstreamer-pbutils-1.0
   gio-2.0
   gconf-2.0],
   have_gst=yes,

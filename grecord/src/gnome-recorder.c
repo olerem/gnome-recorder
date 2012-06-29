@@ -40,7 +40,7 @@ void gsr_quit (void);
 void gsr_add_recent (gchar *filename);
 GtkWidget * gsr_open_window (const char *filename);
 
-extern void gnome_media_profiles_init (GConfClient *conf);
+//extern void gnome_media_profiles_init (GConfClient *conf);
  
 static GList *windows = NULL;
 
@@ -196,7 +196,7 @@ main (int argc,
 	gconf_client = gconf_client_get_default ();
 
 	/* init gnome-media-profiles */
-	gnome_media_profiles_init (gconf_client);
+	//gnome_media_profiles_init (gconf_client);
 
 	if (filenames != NULL && filenames[0] != NULL) {
 		guint i, num;
