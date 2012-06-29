@@ -89,9 +89,9 @@ dnl=======================================================================
 dnl Check for GStreamer and GSR deps
 dnl=======================================================================
 
-GST_REQ=0.10.23
-GST_PLUGINS_BASE_REQ=0.10.23
-GST_MAJORMINOR=0.10
+GST_REQ=0.11.92
+GST_PLUGINS_BASE_REQ=0.11.92
+GST_MAJORMINOR=1.0
 
 dnl make available to Makefile.am
 AC_SUBST(GST_MAJORMINOR)
