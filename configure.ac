@@ -230,10 +230,7 @@ grecord/icons/24x24/Makefile
 grecord/icons/32x32/Makefile
 grecord/icons/48x48/Makefile
 grecord/icons/scalable/Makefile
-gstreamer-properties/Makefile
-gstreamer-properties/help/Makefile
 grecord/gnome-sound-recorder.desktop.in
-gstreamer-properties/gstreamer-properties.desktop.in
 ])
 
 AC_OUTPUT
@@ -249,7 +246,6 @@ echo "
         Compiler:               ${CC}
         CFLAGS:                 ${CFLAGS}
 
-        GStreamer properties:   $have_gstprops
         Sound recorder:         $have_grecord$grecord_reason
 "
 

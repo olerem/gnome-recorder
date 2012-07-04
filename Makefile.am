@@ -10,10 +10,6 @@ if HAVE_SOUND_THEME
 SUBDIRS += sound-theme
 endif
 
-if HAVE_GSTPROPS
-SUBDIRS += gstreamer-properties
-endif
-
 DISTCHECK_CONFIGURE_FLAGS = \
 	--disable-scrollkeeper	\
 	--enable-more-warnings  \
@@ -22,7 +18,6 @@ DISTCHECK_CONFIGURE_FLAGS = \
 DIST_SUBDIRS = \
 	po 			\
 	grecord			\
-	gstreamer-properties	\
 	sound-theme		\
 	$(NULL)
 
