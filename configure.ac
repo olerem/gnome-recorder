@@ -125,7 +125,7 @@ if test "x$have_gst" = "xyes" && test "x$enable_grecord" = "xyes"; then
   have_grecord=yes
 else
   if test "x$have_gst" = "xno"; then
-    AC_MSG_WARN([You need GStreamer installed for the mixer and recorder to work])
+    AC_MSG_WARN([You need GStreamer installed for the recorder to work])
     sleep 5 2>/dev/null
   fi
 fi
@@ -157,81 +157,6 @@ GNOME_DOC_INIT
 
 AM_PROG_LIBTOOL
 AM_PROG_CC_C_O
-
-dnl=======================================================================
-dnl gstreamer-properties
-dnl=======================================================================
-
-have_gstprops=no
-
-AC_ARG_ENABLE([gstprops],
-  AS_HELP_STRING([--enable-gstprops], [enable gstreamer properties]),
-  ,enable_gstprops=yes)
-
-if test "x$have_gst" = "xyes" && test "x$enable_gstprops" = "xyes";
-then
-  PKG_CHECK_MODULES(GSTPROPS, [
-    glib-2.0
-    gtk+-3.0 >= $GTK_REQUIRED_VERSION
-    gconf-2.0
-    gstreamer-$GST_MAJORMINOR
-    gstreamer-plugins-base-$GST_MAJORMINOR >= $GST_PLUGINS_BASE_REQ
-    libxml-2.0],
-    have_gstprops=yes)
-
-  GSTPROPS_LIBS="$GSTPROPS_LIBS -lgstinterfaces-$GST_MAJORMINOR"
-
-  GNOMECC_DESKTOP_DIR=${datadir}/control-center-2.0/capplets
-  AS_AC_EXPAND(GNOMECC_DESKTOP_DIR, $GNOMECC_DESKTOP_DIR)
-  AC_DEFINE_UNQUOTED(GNOMECC_DESKTOP_DIR, "$GNOMECC_DESKTOP_DIR",
-                     [Install path for Gnome control-center integration])
-  AC_SUBST(GNOMECC_DESKTOP_DIR)
-  AC_SUBST(PROGRAMS_GSTPROPS)
-fi
-
-AC_SUBST(GSTPROPS_CFLAGS)
-AC_SUBST(GSTPROPS_LIBS)
-AM_CONDITIONAL(HAVE_GSTPROPS, [test x$have_gstprops = xyes])
-
-dnl=======================================================================
-dnl gst-mixer
-dnl=======================================================================
-
-have_gstmixer=no
-
-AC_ARG_ENABLE([gstmix],
-  AS_HELP_STRING([--enable-gstmix], [enable gstreamer mixer]),
-  ,enable_gstmix=auto)
-
-if test "x$enable_gstmix" = "xauto" && test "x$have_pulseaudio" = "xno"; then
-  enable_gstmix=yes
-fi
-
-if test "x$have_gst" = "xyes" && test "x$enable_gstmix" = "xyes";
-then
-  PKG_CHECK_MODULES(GSTMIXER, [
-    gtk+-3.0 >= $GTK_REQUIRED_VERSION
-    gconf-2.0
-    gstreamer-$GST_MAJORMINOR
-    gstreamer-plugins-base-$GST_MAJORMINOR
-  ],
-  [
-    OLD_CPPFLAGS=$CPPFLAGS
-    CPPFLAGS="$CPPFLAGS $GSTMIXER_CFLAGS"
-
-    AC_CHECK_HEADER(gst/audio/mixerutils.h,
-      [AC_CHECK_HEADER(gst/interfaces/mixer.h,
-        [AC_CHECK_HEADER(gst/interfaces/propertyprobe.h, have_gstmixer=yes)])])
-
-    CPPFLAGS=$OLD_CPPFLAGS
-    GSTMIXER_LIBS="$GSTMIXER_LIBS -lgstinterfaces-$GST_MAJORMINOR -lgstaudio-$GST_MAJORMINOR"
-  ])
-fi
-
-AC_SUBST(GSTMIXER_CFLAGS)
-AC_SUBST(GSTMIXER_LIBS)
-AM_CONDITIONAL(HAVE_GSTMIXER, [test x$have_gstmixer = xyes])
-
 
 dnl ---------------------------------------------------------------------------
 dnl - Finish
@@ -307,16 +232,7 @@ grecord/icons/48x48/Makefile
 grecord/icons/scalable/Makefile
 gstreamer-properties/Makefile
 gstreamer-properties/help/Makefile
-gst-mixer/Makefile
-gst-mixer/icons/Makefile
-gst-mixer/icons/16x16/Makefile
-gst-mixer/icons/16x16/devices/Makefile
-gst-mixer/icons/16x16/status/Makefile
-gst-mixer/src/Makefile
-gst-mixer/pixmaps/Makefile
-gst-mixer/doc/Makefile
 grecord/gnome-sound-recorder.desktop.in
-gst-mixer/gnome-volume-control.desktop.in
 gstreamer-properties/gstreamer-properties.desktop.in
 ])
 
@@ -335,10 +251,5 @@ echo "
 
         GStreamer properties:   $have_gstprops
         Sound recorder:         $have_grecord$grecord_reason
-
-  *Deprecated*:
-
-        GStreamer mixer:        $have_gstmixer
-
 "
 

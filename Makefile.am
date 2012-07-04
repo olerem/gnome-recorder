@@ -10,10 +10,6 @@ if HAVE_SOUND_THEME
 SUBDIRS += sound-theme
 endif
 
-if HAVE_GSTMIXER
-SUBDIRS += gst-mixer
-endif
-
 if HAVE_GSTPROPS
 SUBDIRS += gstreamer-properties
 endif
@@ -26,7 +22,6 @@ DISTCHECK_CONFIGURE_FLAGS = \
 DIST_SUBDIRS = \
 	po 			\
 	grecord			\
-	gst-mixer		\
 	gstreamer-properties	\
 	sound-theme		\
 	$(NULL)
@@ -38,7 +33,6 @@ EXTRA_DIST = \
 	COPYING			\
 	COPYING-DOCS		\
 	COPYING.grecord		\
-	COPYING.gst-mixer	\
 	MAINTAINERS		\
         build-aux/git-version-gen \
 	build-aux/gnome-doc-utils.make	\
