@@ -44,6 +44,7 @@
 #include <gconf/gconf-client.h>
 #include <gst/gst.h>
 #include <gst/gstpad.h>
+#include <gst/gstdatetime.h>
 
 #include <gst/pbutils/encoding-profile.h>
 
@@ -180,6 +181,32 @@ show_error_dialog (GtkWindow *win, const gchar *dbg, const gchar * format, ...)
 	gtk_widget_destroy (dialog);
 	g_free (s);
 }
+
+static void
+gsr_set_tags (GSRWindow *window)
+{
+	GSRWindowPrivate *priv = window->priv;
+	GstPad *active_pad;
+	GstDateTime *gst_datetime;
+	GstTagList *taglist;
+
+	g_assert (priv->datetime != NULL);
+
+	gst_datetime = gst_date_time_new_from_g_date_time (priv->datetime);
+
+	taglist = gst_tag_list_new (
+		GST_TAG_APPLICATION_NAME, "gnome-sound-recorder",
+		GST_TAG_DATE_TIME, gst_datetime,
+		GST_TAG_TITLE, priv->filename,
+		GST_TAG_KEYWORDS, "gnome-sound-recorder", NULL);
+
+	active_pad = gst_element_get_static_pad (priv->record->src, "src");
+	gst_pad_push_event (active_pad,
+		gst_event_new_tag ("gsr_tags", gst_tag_list_copy (taglist)));
+
+	gst_date_time_unref (gst_datetime);
+}
+
 
 /* Why do we need this? when a bin changes from READY => NULL state, its
  * bus is set to flushing and we're unlikely to ever see any of its messages
@@ -1231,6 +1258,7 @@ record_cb (GtkAction *action,
 			      NULL);
 
 		gst_element_set_state (priv->record->pipeline, GST_STATE_PLAYING);
+		gsr_set_tags (window);
 		gtk_widget_set_sensitive (window->priv->level, TRUE);
 		gtk_widget_set_sensitive (window->priv->volume_label, TRUE);
 
