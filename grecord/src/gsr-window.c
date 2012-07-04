@@ -146,11 +146,9 @@ struct _GSRWindowPrivate {
 	guint       ebusy_timeout_id;
 
 	GstElement *source;
-	GstMixer *mixer;
 };
 
 static gboolean            make_record_source      (GSRWindow         *window);
-static void                fill_record_input       (GSRWindow         *window, gchar *selected);
 static GSRWindowPipeline * make_record_pipeline    (GSRWindow         *window);
 static GSRWindowPipeline * make_play_pipeline      (GSRWindow         *window);
 
@@ -1309,12 +1307,9 @@ record_cb (GtkAction *action,
 	GSRWindowPrivate *priv = window->priv;
 
 	if (priv->record) {
-		char *current_source;
 		shutdown_pipeline (priv->record);
 		if (!make_record_source (window))
 			return;
-		current_source = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT (window->priv->input));
-		fill_record_input (window, current_source);
 	}
 
 	if ((priv->record = make_record_pipeline (window))) {
@@ -1783,7 +1778,6 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 		gtk_adjustment_set_value (gtk_range_get_adjustment (GTK_RANGE (window->priv->scale)), 0.0);
 		gtk_widget_set_sensitive (window->priv->scale, FALSE);
 		gtk_widget_set_sensitive (window->priv->profile, TRUE);
-		gtk_widget_set_sensitive (window->priv->input, GST_IS_MIXER (window->priv->mixer));
 		/* fall through */
 	case GST_STATE_PAUSED:
 		set_action_sensitive (window, "Stop", FALSE);
@@ -1816,7 +1810,7 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 static gboolean
 make_record_source (GSRWindow *window)
 {
-	GstElement *source, *e;
+	GstElement *source;
 
 	source = gst_element_factory_make ("gconfaudiosrc", "gconfaudiosource");
 	if (source == NULL) {
@@ -1836,113 +1830,8 @@ make_record_source (GSRWindow *window)
 		return FALSE;
 	}
 	window->priv->source = source;
-	e = gst_bin_get_by_interface (GST_BIN (source), GST_TYPE_MIXER);
-	window->priv->mixer = GST_MIXER (e);
 
 	return TRUE;
-}
-
-static void
-record_input_changed_cb (GtkComboBox *input, GSRWindow *window)
-{
-	const gchar *text;
-	const GList *l;
-	GstMixerTrack *t = NULL, *new = NULL;
-	static GstMixerTrack *selected = NULL;
-
-	text = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT (input));
-	GST_DEBUG ("record input changed to '%s'", GST_STR_NULL (text));
-
-	if (text == NULL)
-		return;
-
-	/* The pipeline has been destroyed already, we'll try and remember
-	 * the input for the next record run in fill_record_input() */
-	if (GST_IS_MIXER (window->priv->mixer) == FALSE)
-		return;
-
-	for (l = gst_mixer_list_tracks (window->priv->mixer);
-	     l != NULL; l = l->next) {
-		t = l->data;
-		if (t == NULL || t->label == NULL)
-			continue;
-		if ((g_str_equal (t->label, text)) &&
-		    (t->flags & GST_MIXER_TRACK_INPUT)) {
-			if (new == NULL)
-				new = g_object_ref (t);
-		/* FIXME selected == t is equivalent to NULL == t in this case,
-		 * selected, after its initialization to NULL, was never written to
-		 * before this read access to it
-		 * and NULL == t is equivalent to FALSE, because of the check
-		 * "if (t == NULL || t->label == NULL)" above
-		 */
-		} else if (selected == t)
-			/* re-mute old one */
-			gst_mixer_set_record (window->priv->mixer,
-					      selected, FALSE);
-	}
-
-	/* FIXME selected _is_ NULL always at this point - same as 5 lines above*/
-	if (selected != NULL)
-		g_object_unref (selected);
-	if (!(selected = new))
-		return;
-
-	gst_mixer_set_record (window->priv->mixer, selected, TRUE);
-	GST_DEBUG ("input changed to: %s\n", selected->label);
-	gconf_client_set_string (gconf_client, KEY_LAST_INPUT, selected->label, NULL);
-}
-
-static void
-fill_record_input (GSRWindow *window, gchar *selected)
-{
-	const GList *l;
-	int i = 0;
-	int last_possible_i = 0;
-	GtkTreeModel *model;
-
-	model = gtk_combo_box_get_model (GTK_COMBO_BOX (window->priv->input));
-
-	if (model) 
-		gtk_list_store_clear (GTK_LIST_STORE (model));
-
-	if (GST_IS_MIXER (window->priv->mixer) == FALSE
-	    || gst_mixer_list_tracks (window->priv->mixer) == NULL) {
-		gtk_widget_hide (window->priv->input);
-		gtk_widget_hide (window->priv->input_label);
-		return;
-	}
-
-	gtk_widget_set_sensitive (window->priv->input, GST_IS_MIXER (window->priv->mixer));
-	if (!GST_IS_MIXER (window->priv->mixer))
-		return;
-
-	for (l = gst_mixer_list_tracks (window->priv->mixer); l != NULL; l = l->next) {
-		GstMixerTrack *t = l->data;
-		if (t->label == NULL)
-			continue;
-		if (t->flags & GST_MIXER_TRACK_INPUT) {
-			gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (window->priv->input), t->label);
-			++i;
-		}
-		if (t->flags & GST_MIXER_TRACK_RECORD) {
-			if (selected == NULL) {
-				gtk_combo_box_set_active (GTK_COMBO_BOX (window->priv->input), i - 1);
-			} else {
-				last_possible_i = i;
-			}
-		}
-		if ((selected != NULL) && g_str_equal (selected, t->label)) {
-			gtk_combo_box_set_active (GTK_COMBO_BOX (window->priv->input), i - 1);
-		}
-	}
-
-	if (gtk_combo_box_get_active (GTK_COMBO_BOX (window->priv->input)) == -1) {
-		gtk_combo_box_set_active (GTK_COMBO_BOX (window->priv->input), last_possible_i - 1);
-	}
-
-	gtk_widget_show (window->priv->input);
-	gtk_widget_show (window->priv->input_label);
 }
 
 static gboolean
@@ -2358,24 +2247,6 @@ gsr_window_init (GSRWindow *window)
 	gtk_box_pack_start (GTK_BOX (content_vbox), priv->scale, FALSE, FALSE, 6);
 	gtk_widget_show (window->priv->scale);
 
-        /* create source and choose mixer input */
-	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 12);
-	gtk_box_pack_start (GTK_BOX (content_vbox), hbox, FALSE, FALSE, 0);
-
-	priv->input_label = gtk_label_new_with_mnemonic (_("Record from _input:"));
-	gtk_misc_set_alignment (GTK_MISC (priv->input_label), 0, 0.5);
-	gtk_box_pack_start (GTK_BOX (hbox), priv->input_label, FALSE, FALSE, 0);
-
-	priv->input = gtk_combo_box_text_new ();
-	gtk_label_set_mnemonic_widget (GTK_LABEL (priv->input_label), priv->input);
-	gtk_box_pack_start (GTK_BOX (hbox), priv->input, TRUE, TRUE, 0);
-
-	if (!make_record_source (window))
-		exit (1);
-
-	g_signal_connect (priv->input, "changed",
-			  G_CALLBACK (record_input_changed_cb), window);
-
 	/* choose profile */
 	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 12);
 	gtk_box_pack_start (GTK_BOX (content_vbox), hbox, FALSE, FALSE, 0);
@@ -2504,11 +2375,6 @@ gsr_window_init (GSRWindow *window)
 			    _("Ready"));
 
 	gtk_widget_show_all (main_vbox);
-	last_input = gconf_client_get_string (gconf_client, KEY_LAST_INPUT, NULL);
-	fill_record_input (window, last_input);
-	if (last_input) {
-		g_free (last_input);
-	}
 
 	/* Make the pipelines */
 	priv->play = NULL;
