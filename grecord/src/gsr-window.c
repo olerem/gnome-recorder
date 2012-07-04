@@ -121,6 +121,8 @@ struct _GSRWindowPrivate {
 	int len_secs; /* In seconds */
 	int get_length_attempts;
 
+	GDateTime *datetime;
+
 	/* ATOMIC access */
 	struct {
 		gint n_channels;
@@ -1221,6 +1223,8 @@ record_cb (GtkAction *action,
 		if (priv->filename)
 			g_free (priv->filename);
 
+		priv->filename = gsr_generate_filename (window);
+
 		g_print ("%s", priv->record_filename);
 		g_object_set (G_OBJECT (priv->record->sink),
 			      "location", priv->record_filename,
@@ -1570,17 +1574,24 @@ record_eos_msg_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
 }
 
 gchar*
-gsr_generate_filename (void)
+gsr_generate_filename (GSRWindow *window)
 {
-	struct tm *ptr;
-	time_t tm;
+	gchar *string;
+	GDateTime *datetime;
 
-	gchar *date = g_malloc (18);
-	tm  = time (NULL);
-	ptr = localtime (&tm);
-	strftime (date, 18, "%Y-%m-%d-%H%M%S", ptr);
+	datetime = g_date_time_new_now_local ();
+	g_assert (datetime != NULL);
 
-	return date;
+	if (window) {
+		if (window->priv->datetime)
+			g_date_time_unref (window->priv->datetime);
+		window->priv->datetime = g_date_time_ref (datetime);
+	}
+
+	string = g_date_time_format (datetime, "%Y-%m-%d-%H%M%S");
+	g_date_time_unref (datetime);
+
+	return string;
 }
 
 static gboolean
@@ -1591,8 +1602,6 @@ record_start (gpointer user_data)
 
 	g_assert (window->priv->tick_id == 0);
 
-	g_free (window->priv->filename);
-	window->priv->filename = gsr_generate_filename ();
 	gtk_label_set_text (GTK_LABEL (window->priv->name_label),
 						window->priv->filename);
 	title = g_strdup_printf (_("%s — Sound Recorder"),

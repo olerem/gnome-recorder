@@ -131,7 +131,7 @@ gsr_open_window (const char *filename)
 	gchar *name;
 
 	if (filename == NULL) {
-		name = gsr_generate_filename ();
+		name = gsr_generate_filename (NULL);
 	} else {
 		name = g_strdup (filename);
 	}
