@@ -1680,6 +1680,7 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 	case GST_STATE_PLAYING:
 		window->priv->record_id = g_idle_add (record_start, window);
 		g_free (window->priv->extension);
+		window->priv->extension = g_strdup ("ogg");
 		break;
 	case GST_STATE_READY:
 		gtk_adjustment_set_value (gtk_range_get_adjustment (GTK_RANGE (window->priv->scale)), 0.0);
