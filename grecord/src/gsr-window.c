@@ -202,7 +202,7 @@ gsr_set_tags (GSRWindow *window)
 
 	active_pad = gst_element_get_static_pad (priv->record->src, "src");
 	gst_pad_push_event (active_pad,
-		gst_event_new_tag ("gsr_tags", gst_tag_list_copy (taglist)));
+		gst_event_new_tag (gst_tag_list_copy (taglist)));
 
 	gst_date_time_unref (gst_datetime);
 }
