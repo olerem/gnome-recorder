@@ -57,34 +57,6 @@ then
 fi
 AC_MSG_NOTICE([Using $GM_ERROR_CFLAGS as error checking CFLAGS])
 
-GLIB_REQUIRED_VERSION=2.18.2
-GTK_REQUIRED_VERSION=3.4.0
-GCONF_REQUIRED_VERSION=2.6.1
-PA_REQUIRED_VERSION=0.9.16
-CANBERRA_REQUIRED_VERSION=0.13
-
-dnl=======================================================================
-dnl Check for libcanberra
-dnl=======================================================================
-
-PKG_CHECK_MODULES(SOUND_THEME,
-        gobject-2.0 >= $GLIB_REQUIRED_VERSION
-        gtk+-3.0 >= $GTK_REQUIRED_VERSION
-        gio-2.0
-        gconf-2.0 >= $GCONF_REQUIRED_VERSION
-        libcanberra-gtk3 >= $CANBERRA_REQUIRED_VERSION
-        libxml-2.0,
-        have_soundtheme=yes,
-        have_soundtheme=no)
-
-if test "x$have_soundtheme" = "xyes" ; then
-  AC_DEFINE(HAVE_SOUND_THEME, [], [Define if we can build sound theme])
-fi
-AM_CONDITIONAL(HAVE_SOUND_THEME, test x$have_soundtheme = xyes)
-AC_SUBST(HAVE_SOUND_THEME)
-AC_SUBST(SOUNDTHEME_CFLAGS)
-AC_SUBST(SOUNDTHEME_LIBS)
-
 dnl=======================================================================
 dnl Check for GStreamer and GSR deps
 dnl=======================================================================
@@ -217,8 +189,6 @@ AC_SUBST(LDFLAGS)
 AC_CONFIG_FILES([
 Makefile
 po/Makefile.in
-sound-theme/Makefile
-sound-theme/sounds/Makefile
 grecord/Makefile
 grecord/gnome-sound-recorder.schemas.in
 grecord/src/Makefile

@@ -6,10 +6,6 @@ if HAVE_GRECORD
 SUBDIRS += grecord
 endif
 
-if HAVE_SOUND_THEME
-SUBDIRS += sound-theme
-endif
-
 DISTCHECK_CONFIGURE_FLAGS = \
 	--disable-scrollkeeper	\
 	--enable-more-warnings  \
@@ -18,7 +14,6 @@ DISTCHECK_CONFIGURE_FLAGS = \
 DIST_SUBDIRS = \
 	po 			\
 	grecord			\
-	sound-theme		\
 	$(NULL)
 
 EXTRA_DIST = \
