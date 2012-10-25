@@ -168,8 +168,6 @@ main (int argc,
 	GOptionContext *ctx;
 	GError *error = NULL;
 
-	g_thread_init (NULL);
-
 	/* Init gettext */
 	bindtextdomain (GETTEXT_PACKAGE, GNOMELOCALEDIR);
 	bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
