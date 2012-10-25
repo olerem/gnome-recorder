@@ -862,9 +862,7 @@ pack_table_widget (GtkWidget *table,
 		   int left,
 		   int top)
 {
-	gtk_table_attach (GTK_TABLE (table), widget,
-			  left, left + 1, top, top + 1,
-			  GTK_FILL, GTK_FILL, 0, 0);
+	gtk_grid_attach (GTK_GRID (table), widget, left, top, 1, 1);
 }
 
 struct _file_props {
@@ -1035,9 +1033,9 @@ file_properties_cb (GtkAction *action,
 	gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
 
 	/* File properties */	
-	table = gtk_table_new (3, 2, FALSE);
-	gtk_table_set_col_spacings (GTK_TABLE (table), 12);
-	gtk_table_set_row_spacings (GTK_TABLE (table), 6);
+	table = gtk_grid_new ();
+	gtk_grid_set_column_spacing (GTK_GRID (table), 12);
+	gtk_grid_set_row_spacing (GTK_GRID (table), 6);
 	gtk_box_pack_start (GTK_BOX (hbox), table, TRUE, TRUE, 0);
 
 	label = make_info_label (_("Folder:"));
@@ -1071,9 +1069,9 @@ file_properties_cb (GtkAction *action,
 	gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
 
 	/* Audio info */
-	table = gtk_table_new (4, 2, FALSE);
-	gtk_table_set_col_spacings (GTK_TABLE (table), 12);
-	gtk_table_set_row_spacings (GTK_TABLE (table), 6);
+	table = gtk_grid_new ();
+	gtk_grid_set_column_spacing (GTK_GRID (table), 12);
+	gtk_grid_set_row_spacing (GTK_GRID (table), 6);
 	gtk_box_pack_start (GTK_BOX (hbox), table, TRUE, TRUE, 0);
 
 	label = make_info_label (_("File duration:"));
@@ -2088,33 +2086,26 @@ gsr_window_init (GSRWindow *window)
 	label = gtk_label_new ("    "); /* FIXME: better padding? */
 	gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
 
-	table = gtk_table_new (3, 2, FALSE);
-	gtk_table_set_col_spacings (GTK_TABLE (table), 12);
-	gtk_table_set_row_spacings (GTK_TABLE (table), 6);
+	table = gtk_grid_new ();
+	gtk_grid_set_column_spacing (GTK_GRID (table), 12);
+	gtk_grid_set_row_spacing (GTK_GRID (table), 6);
 	gtk_box_pack_start (GTK_BOX (hbox), table, TRUE, TRUE, 0);
 
 	label = make_title_label (_("File Information"));
 
 	gtk_misc_set_alignment (GTK_MISC (label), 0, 0.5);
-	gtk_table_attach (GTK_TABLE (table), label,
-			  0, 2, 0, 1,
-			  GTK_FILL, 0, 0, 0);
+	gtk_grid_attach (GTK_GRID (table), label, 0, 0, 2, 1);
 
 	label = gtk_label_new (_("Filename:"));
 
 	gtk_misc_set_alignment (GTK_MISC (label), 0, 0.5);
-	gtk_table_attach (GTK_TABLE (table), label,
-			  0, 1, 1, 2,
-			  GTK_FILL, 0, 0, 0);
+	gtk_grid_attach (GTK_GRID (table), label, 0, 1, 1, 1);
 
 	priv->name_label = gtk_label_new (_("<none>"));
 	gtk_label_set_selectable (GTK_LABEL (priv->name_label), TRUE);
 	gtk_label_set_line_wrap (GTK_LABEL (priv->name_label), GTK_WRAP_WORD);
 	gtk_misc_set_alignment (GTK_MISC (priv->name_label), 0, 0.5);
-	gtk_table_attach (GTK_TABLE (table), priv->name_label,
-			  1, 2, 1, 2,
-			  GTK_FILL  | GTK_EXPAND, 0,
-			  0, 0);
+	gtk_grid_attach (GTK_GRID (table), priv->name_label, 1, 1, 1, 1);
 
 	atk_object_add_relationship (gtk_widget_get_accessible (GTK_WIDGET (priv->name_label)),
 				ATK_RELATION_LABELLED_BY,
@@ -2124,17 +2115,12 @@ gsr_window_init (GSRWindow *window)
 	label = gtk_label_new (_("Length:"));
 
 	gtk_misc_set_alignment (GTK_MISC (label), 0, 0.5);
-	gtk_table_attach (GTK_TABLE (table), label,
-			  0, 1, 2, 3,
-			  GTK_FILL, 0, 0, 0);
+	gtk_grid_attach (GTK_GRID (table), label, 0, 2, 1, 1);
 
 	priv->length_label = gtk_label_new ("");
 	gtk_label_set_selectable (GTK_LABEL (priv->length_label), TRUE);
 	gtk_misc_set_alignment (GTK_MISC (priv->length_label), 0, 0.5);
-	gtk_table_attach (GTK_TABLE (table), priv->length_label,
-			  1, 2, 2, 3,
-			  GTK_FILL | GTK_EXPAND, 0,
-			  0, 0);
+	gtk_grid_attach (GTK_GRID (table), priv->length_label, 1, 2, 1, 1);
 
 	atk_object_add_relationship (gtk_widget_get_accessible (GTK_WIDGET (priv->length_label)),
 				ATK_RELATION_LABELLED_BY,
