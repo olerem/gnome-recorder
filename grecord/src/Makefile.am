@@ -24,6 +24,7 @@ EXTRA_DIST = $(ui_DATA)
 
 gnome_sound_recorder_LDADD =					\
 	-lm							\
-	$(GSR_LIBS) -lgstinterfaces-@GST_MAJORMINOR@
+	$(GSR_LIBS)
+#	$(GSR_LIBS) -lgstinterfaces-@GST_MAJORMINOR@
 
 -include $(top_srcdir)/git.mk
