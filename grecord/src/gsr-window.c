@@ -1217,10 +1217,6 @@ stop_cb (GtkAction *action,
 		msg = gst_bus_timed_pop_filtered (GST_ELEMENT_BUS (priv->record->pipeline), GST_SECOND, GST_MESSAGE_EOS | GST_MESSAGE_ERROR);
 		gst_message_unref (msg);
 
-		gst_element_set_state (priv->record->src, GST_STATE_NULL);
-		gst_element_get_state (priv->record->src, NULL, NULL, -1);
-		gst_element_set_locked_state (priv->record->src, TRUE);
-
 		GST_DEBUG ("Stopping recording pipeline");
 		set_pipeline_state_to_null (priv->record->pipeline);
 		gtk_widget_set_sensitive (window->priv->level, FALSE);
