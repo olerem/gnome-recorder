@@ -1706,39 +1706,38 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
 static gboolean
 level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
 {
-  GSRWindowPrivate *priv = window->priv;
 
   if (message->type == GST_MESSAGE_ELEMENT) {
+    GSRWindowPrivate *priv = window->priv;
     const GstStructure *s = gst_message_get_structure (message);
     const gchar *name = gst_structure_get_name (s);
 
-    if (g_str_equal (name, "level")) {
-      gint channels;
+    if (g_strcmp0 (name, "level") == 0) {
+      gint channels, i;
       gdouble peak_dB;
-      gdouble myind;
+      gdouble max_peak_dB = -G_MAXDOUBLE;
+      gdouble indicator;
       const GValue *array_val;
       const GValueArray *array;
-      const GValue *value;
-
-
-      gint i;
-      /* we can get the number of channels as the length of any of the value
-       * lists */
 
       array_val = gst_structure_get_value (s, "peak");
       array = (GValueArray *) g_value_get_boxed (array_val);
       channels = array->n_values;
 
       for (i = 0; i < channels; ++i) {
-        array_val = gst_structure_get_value (s, "peak");
-        array = (GValueArray *) g_value_get_boxed (array_val);
-        value = g_value_array_get_nth (array, i);
-        peak_dB = g_value_get_double (value);
-	myind = exp (peak_dB / 20);
-	if (myind > 1.0)
-		myind = 1.0;
-	gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (priv->level), myind);
+        /* g_value_array_get_nth (array, i) is deprecated
+         * so we access array->values directly. */
+        peak_dB = g_value_get_double (array->values+i);
+        /* we use only biggest valie from different channels
+         * and send it to indicator */
+        if (max_peak_dB < peak_dB)
+          max_peak_dB = peak_dB;
       }
+
+      indicator = exp (max_peak_dB / 20);
+      if (indicator > 1.0)
+        indicator = 1.0;
+      gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (priv->level), indicator);
     }
   }
   /* we handled the message we want, and ignored the ones we didn't want.
