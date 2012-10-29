@@ -1,4 +1,3 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- */
 /*
  *  Authors: Iain Holmes <iain@prettypeople.org>
  *
@@ -51,167 +50,167 @@ static gboolean
 delete_event_cb (GSRWindow *window,
 		 gpointer data)
 {
-	if (!gsr_window_is_saved (window) && !gsr_discard_confirmation_dialog (window, TRUE))
-		return TRUE;
+  if (!gsr_window_is_saved (window) &&
+      !gsr_discard_confirmation_dialog (window, TRUE))
+    return TRUE;
 
-	return FALSE;
+  return FALSE;
 }
 
 static void
 window_destroyed (GtkWidget *window,
 		  gpointer data)
 {
-	windows = g_list_remove (windows, window);
+  windows = g_list_remove (windows, window);
 
-	if (windows == NULL) {
-		gtk_main_quit ();
-	}
+  if (windows == NULL) {
+    gtk_main_quit ();
+  }
 }
 
 void
 gsr_quit (void) 
 {
-	GList *p;
+  GList *p;
 
-	for (p = windows; p;) {
-		GSRWindow *window = p->data;
+  for (p = windows; p;) {
+    GSRWindow *window = p->data;
 
-		/* p is set here instead of in the for statement,
-		   because by the time we get back to the loop,
-		   p will be invalid */
-		p = p->next;
+    /* p is set here instead of in the for statement,
+       because by the time we get back to the loop,
+       p will be invalid */
+    p = p->next;
 
-		if (gsr_window_is_saved (window) || gsr_discard_confirmation_dialog (window, TRUE))
-			gsr_window_close (window);
-	}
+    if (gsr_window_is_saved (window) ||
+        gsr_discard_confirmation_dialog (window, TRUE))
+      gsr_window_close (window);
+  }
 }
 
 void
 gsr_add_recent (gchar *filename)
 {
-	GtkRecentData data;
-	char *groups[] = { NULL, NULL };
-	char *uri;
+  GtkRecentData data;
+  char *groups[] = { NULL, NULL };
+  char *uri;
 
-	memset (&data, 0, sizeof (data));
+  memset (&data, 0, sizeof (data));
 
-	uri = g_filename_to_uri (filename, NULL, NULL);
-	if (uri == NULL)
-		return;
+  uri = g_filename_to_uri (filename, NULL, NULL);
+  if (uri == NULL)
+    return;
 
-	data.mime_type = g_content_type_guess (uri, NULL, 0, NULL);
-	if (data.mime_type == NULL) {
-		/* No mime-type means warnings, and it breaks when adding
-		 * non-GIO supported URI schemes */
-		g_free (uri);
-		return;
-	}
+  data.mime_type = g_content_type_guess (uri, NULL, 0, NULL);
+  if (data.mime_type == NULL) {
+    /* No mime-type means warnings, and it breaks when adding
+     * non-GIO supported URI schemes */
+    g_free (uri);
+    return;
+  }
 
-	/* It's a local file */
-	data.display_name = g_filename_display_basename (data.display_name);
-	groups[0] = "Totem";
+  /* It's a local file */
+  data.display_name = g_filename_display_basename (data.display_name);
+  groups[0] = "Totem";
 
-	data.app_name = g_strdup (g_get_application_name ());
-	data.app_exec = g_strjoin (" ", g_get_prgname (), "%u", NULL);
-	data.groups = groups;
-	gtk_recent_manager_add_full (gtk_recent_manager_get_default (),
+  data.app_name = g_strdup (g_get_application_name ());
+  data.app_exec = g_strjoin (" ", g_get_prgname (), "%u", NULL);
+  data.groups = groups;
+  gtk_recent_manager_add_full (gtk_recent_manager_get_default (),
 				     uri, &data);
 
-	g_free (data.display_name);
-	g_free (data.mime_type);
-	g_free (data.app_name);
-	g_free (data.app_exec);
+  g_free (data.display_name);
+  g_free (data.mime_type);
+  g_free (data.app_name);
+  g_free (data.app_exec);
 
 }
 
 GtkWidget *
 gsr_open_window (const char *filename)
 {
-	GtkWidget *window;
-	gchar *name;
+  GtkWidget *window;
+  gchar *name;
 
-	if (filename == NULL) {
-		name = gsr_generate_filename (NULL);
-	} else {
-		name = g_strdup (filename);
-	}
+  if (filename == NULL)
+    name = gsr_generate_filename (NULL);
+  else
+    name = g_strdup (filename);
 
-	window = GTK_WIDGET (gsr_window_new (name));
-	g_free (name);
+  window = GTK_WIDGET (gsr_window_new (name));
+  g_free (name);
 
-	g_signal_connect (G_OBJECT (window), "delete-event",
-			  G_CALLBACK (delete_event_cb), NULL);
+  g_signal_connect (G_OBJECT (window), "delete-event",
+      G_CALLBACK (delete_event_cb), NULL);
 
-	g_signal_connect (G_OBJECT (window), "destroy",
-			  G_CALLBACK (window_destroyed), NULL);
+  g_signal_connect (G_OBJECT (window), "destroy",
+      G_CALLBACK (window_destroyed), NULL);
 
-	windows = g_list_prepend (windows, window);
-	gtk_widget_show (window);
+  windows = g_list_prepend (windows, window);
+  gtk_widget_show (window);
 
-	return window;
+  return window;
 }
 
 int
 main (int argc,
       char **argv)
 {
-	gchar **filenames = NULL;
-	/* this is necessary because someone apparently forgot to add a
-	 * convenient way to get the remaining arguments to the GnomeProgram
-	 * API when adding the GOption stuff to it ... */
-	const GOptionEntry entries[] = {
-		{ G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &filenames,
-		"Special option that collects any remaining arguments for us" },
-		{ NULL, }
-	};
+  gchar **filenames = NULL;
+  /* this is necessary because someone apparently forgot to add a
+   * convenient way to get the remaining arguments to the GnomeProgram
+   * API when adding the GOption stuff to it ... */
+  const GOptionEntry entries[] = {
+    { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &filenames,
+    "Special option that collects any remaining arguments for us" },
+    { NULL, }
+  };
 
-	GOptionContext *ctx;
-	GError *error = NULL;
+  GOptionContext *ctx;
+  GError *error = NULL;
 
-	/* Init gettext */
-	bindtextdomain (GETTEXT_PACKAGE, GNOMELOCALEDIR);
-	bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
-	textdomain (GETTEXT_PACKAGE);
+  /* Init gettext */
+  bindtextdomain (GETTEXT_PACKAGE, GNOMELOCALEDIR);
+  bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+  textdomain (GETTEXT_PACKAGE);
 
-	ctx = g_option_context_new ("gnome-sound-recorder");
-	/* Initializes gtk during option parsing */
-	g_option_context_add_group (ctx, gtk_get_option_group (TRUE));
-	g_option_context_add_group (ctx, gst_init_get_option_group ());
-	g_option_context_add_main_entries (ctx, entries, GETTEXT_PACKAGE);
+  ctx = g_option_context_new ("gnome-sound-recorder");
+  /* Initializes gtk during option parsing */
+  g_option_context_add_group (ctx, gtk_get_option_group (TRUE));
+  g_option_context_add_group (ctx, gst_init_get_option_group ());
+  g_option_context_add_main_entries (ctx, entries, GETTEXT_PACKAGE);
 
-	if (!g_option_context_parse (ctx, &argc, &argv, &error)) {
-		g_printerr ("Option parsing failed: %s\n", error->message);
-		g_error_free (error);
-		g_option_context_free (ctx);
-		return EXIT_FAILURE;
-	}
+  if (!g_option_context_parse (ctx, &argc, &argv, &error)) {
+    g_printerr ("Option parsing failed: %s\n", error->message);
+    g_error_free (error);
+    g_option_context_free (ctx);
+    return EXIT_FAILURE;
+  }
 
-	g_option_context_free (ctx);
-	gtk_window_set_default_icon_name ("gnome-sound-recorder");
-	g_setenv ("PULSE_PROP_media.role", "production", TRUE);
+  g_option_context_free (ctx);
+  gtk_window_set_default_icon_name ("gnome-sound-recorder");
+  g_setenv ("PULSE_PROP_media.role", "production", TRUE);
 
-	/* use it like a singleton */
-	gconf_client = gconf_client_get_default ();
+  /* use it like a singleton */
+  gconf_client = gconf_client_get_default ();
 
-	/* init gnome-media-profiles */
-	//gnome_media_profiles_init (gconf_client);
+  /* init gnome-media-profiles */
+  //gnome_media_profiles_init (gconf_client);
 
-	if (filenames != NULL && filenames[0] != NULL) {
-		guint i, num;
+  if (filenames != NULL && filenames[0] != NULL) {
+    guint i, num;
 
-		num = g_strv_length (filenames);
-		for (i = 0; i < num; ++i) {
-			gsr_open_window (filenames[i]);
-		}
-	} else {
-			gsr_open_window (NULL);
-	}
+    num = g_strv_length (filenames);
 
-	if (filenames) {
-		g_strfreev (filenames);
-	}
+    for (i = 0; i < num; ++i)
+      gsr_open_window (filenames[i]);
 
-	gtk_main ();
+  } else
+    gsr_open_window (NULL);
 
-	return 0;
+  if (filenames)
+    g_strfreev (filenames);
+
+  gtk_main ();
+
+  return 0;
 }

@@ -1,4 +1,3 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- */
 /*
  *  Authors: Iain Holmes <iain@prettypeople.org>
  *
@@ -41,13 +40,12 @@ typedef struct _GSRWindowClass GSRWindowClass;
 typedef struct _GSRWindowPrivate GSRWindowPrivate;
 
 struct _GSRWindow {
-	GtkWindow parent;
-
-	GSRWindowPrivate *priv;
+  GtkWindow parent;
+  GSRWindowPrivate *priv;
 };
 
 struct _GSRWindowClass {
-	GtkWindowClass parent_class;
+  GtkWindowClass parent_class;
 };
 
 
