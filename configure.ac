@@ -77,8 +77,7 @@ PKG_CHECK_MODULES(GSR, [
   gstreamer-plugins-base-$GST_MAJORMINOR >= $GST_REQ
   gtk+-3.0 >= 2.6.0
   gstreamer-pbutils-1.0
-  gio-2.0
-  gconf-2.0],
+  gio-2.0],
   have_gst=yes,
   [
     AC_MSG_RESULT(no)
@@ -110,9 +109,6 @@ AM_CONDITIONAL(HAVE_GRECORD, [test x$have_grecord = xyes])
 dnl uninstalled gsr ui dir
 AC_DEFINE_UNQUOTED(GSR_UIDIR_UNINSTALLED, "`pwd`/grecord/src",
   [path to uninstalled gnome-sound-recorder UI dir])
-
-AC_PATH_PROG(GCONFTOOL, gconftool-2)
-AM_GCONF_SOURCE_2
 
 AC_PATH_PROG(GLIB_GENMARSHAL, glib-genmarshal)
 
@@ -190,7 +186,6 @@ AC_CONFIG_FILES([
 Makefile
 po/Makefile.in
 grecord/Makefile
-grecord/gnome-sound-recorder.schemas.in
 grecord/src/Makefile
 grecord/doc/Makefile
 grecord/icons/Makefile

@@ -29,7 +29,6 @@
 #include <string.h>
 
 #include <glib/gi18n.h>
-#include <gconf/gconf-client.h>
 #include <gst/gst.h>
 #include <stdlib.h>
 
@@ -39,12 +38,7 @@ void gsr_quit (void);
 void gsr_add_recent (gchar *filename);
 GtkWidget * gsr_open_window (const char *filename);
 
-//extern void gnome_media_profiles_init (GConfClient *conf);
- 
 static GList *windows = NULL;
-
-/* Also used in gsr-window.c as extern GConfClient *gconf_client */
-GConfClient *gconf_client = NULL;
 
 static gboolean
 delete_event_cb (GSRWindow *window,
@@ -189,12 +183,6 @@ main (int argc,
   g_option_context_free (ctx);
   gtk_window_set_default_icon_name ("gnome-sound-recorder");
   g_setenv ("PULSE_PROP_media.role", "production", TRUE);
-
-  /* use it like a singleton */
-  gconf_client = gconf_client_get_default ();
-
-  /* init gnome-media-profiles */
-  //gnome_media_profiles_init (gconf_client);
 
   if (filenames != NULL && filenames[0] != NULL) {
     guint i, num;

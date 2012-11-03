@@ -40,7 +40,6 @@
 #include <glib/gi18n.h>
 #include <gio/gio.h>
 #include <gtk/gtk.h>
-#include <gconf/gconf-client.h>
 #include <gst/gst.h>
 #include <gst/gstpad.h>
 #include <gst/gstdatetime.h>
@@ -54,8 +53,6 @@ GST_DEBUG_CATEGORY_STATIC (gsr_debug);
 
 extern GtkWidget * gsr_open_window (const char *filename);
 extern void gsr_quit (void);
-
-extern GConfClient *gconf_client;
 
 extern void gsr_add_recent (gchar *filename);
 
@@ -1942,10 +1939,6 @@ gsr_window_init (GSRWindow *window)
   GtkShadowType shadow_type;
   window->priv = GSR_WINDOW_GET_PRIVATE (window);
   priv = window->priv;
-
-  /* treat gconf client as a singleton */
-  if (gconf_client == NULL)
-    gconf_client = gconf_client_get_default ();
 
   main_vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
   gtk_container_add (GTK_CONTAINER (window), main_vbox);
