@@ -1,10 +1,6 @@
 NULL =
 
-SUBDIRS = po
-
-if HAVE_GRECORD
-SUBDIRS += grecord
-endif
+SUBDIRS = po src doc icons
 
 DISTCHECK_CONFIGURE_FLAGS = \
 	--disable-scrollkeeper	\
@@ -13,7 +9,6 @@ DISTCHECK_CONFIGURE_FLAGS = \
 
 DIST_SUBDIRS = \
 	po 			\
-	grecord			\
 	$(NULL)
 
 EXTRA_DIST = \
@@ -29,10 +24,21 @@ EXTRA_DIST = \
 	m4/as-compiler-flag.m4	\
 	m4/as-version.m4	\
 	ChangeLog.pre-2-26	\
+	gnome-sound-recorder.desktop.in.in \
+	README AUTHORS INSTALL \
 	$(INTLTOOL_BUILT:=.in)	\
 	$(NULL)
 
+Applicationsdir = $(datadir)/applications
+Applications_in_files = gnome-sound-recorder.desktop.in.in
+Applications_DATA = $(Applications_in_files:.desktop.in.in=.desktop)
+
+@INTLTOOL_DESKTOP_RULE@
+
+CLEANFILES=$(Applications_DATA)
+
 DISTCLEANFILES = \
+	$(Applications_in_files:.desktop.in.in=.desktop.in) \
 	build-aux/gnome-doc-utils.make	\
 	po/.intltool-merge-cache	\
 	$(NULL)

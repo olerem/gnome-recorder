@@ -1,18 +1,18 @@
-GNOME Media is deprecated, although some programs still relies on some
-libraries it offers, and some people still use some of the tools.
+GNOME Sound record (grecord) is a simple program for recording
+and playing sound files.
+You can start it by either typing 'grecord' at the command line
+or selecting GNOME menu->Multimedia->Soundrecorder if you're
+running GNOME.
 
-GNOME media contains the following tools & library:
+It's goal isn't to be a super ultra wav editor, just to
+be able to play and record, and later, be able
+to do some basic "effects".
 
-grecord                 - GNOME Sound Recorder
-profiles                - Audio Profile library
-gstreamer-properties    - GStreamer Properties Capplet
-gst-mixer               - GNOME GStreamer-based audio mixer  (deprecated in favour of control-center PulseAudio volume control)
+If you have any questions, ideas, bugreports, please send
+them to:
+gnome-multimedia@gnome.org
+or add them to our Bug tracking system
+http://bugzilla.gnome.org/enter_bug.cgi?product=gnome-media
 
-Refer to the following files for license information for each sub-component
-of gnome-media:
 
-gstreamer-properties - COPYING
-grecord              - COPYING.grecord
-gst-mixer            - COPYING.gst-mixer
-profiles             - COPYING.profiles
-documentation        - COPYING-DOCS
+

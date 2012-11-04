@@ -107,7 +107,7 @@ AM_CONDITIONAL(HAVE_GSTREAMER, [test x$have_gst = xyes])
 AM_CONDITIONAL(HAVE_GRECORD, [test x$have_grecord = xyes])
 
 dnl uninstalled gsr ui dir
-AC_DEFINE_UNQUOTED(GSR_UIDIR_UNINSTALLED, "`pwd`/grecord/src",
+AC_DEFINE_UNQUOTED(GSR_UIDIR_UNINSTALLED, "`pwd`/src",
   [path to uninstalled gnome-sound-recorder UI dir])
 
 AC_PATH_PROG(GLIB_GENMARSHAL, glib-genmarshal)
@@ -185,17 +185,16 @@ AC_SUBST(LDFLAGS)
 AC_CONFIG_FILES([
 Makefile
 po/Makefile.in
-grecord/Makefile
-grecord/src/Makefile
-grecord/doc/Makefile
-grecord/icons/Makefile
-grecord/icons/16x16/Makefile
-grecord/icons/22x22/Makefile
-grecord/icons/24x24/Makefile
-grecord/icons/32x32/Makefile
-grecord/icons/48x48/Makefile
-grecord/icons/scalable/Makefile
-grecord/gnome-sound-recorder.desktop.in
+src/Makefile
+doc/Makefile
+icons/Makefile
+icons/16x16/Makefile
+icons/22x22/Makefile
+icons/24x24/Makefile
+icons/32x32/Makefile
+icons/48x48/Makefile
+icons/scalable/Makefile
+gnome-sound-recorder.desktop.in
 ])
 
 AC_OUTPUT
