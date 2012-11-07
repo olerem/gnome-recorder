@@ -58,7 +58,7 @@ extern void gsr_quit (void);
 extern void gsr_add_recent (gchar *filename);
 
 #define EBUSY_TRY_AGAIN     3    /* Empirical data */
-
+#if 0
 typedef struct _GSRWindowPipeline {
   GstElement *pipeline;
   GstState    state;     /* last seen (async) pipeline state */
@@ -70,6 +70,7 @@ typedef struct _GSRWindowPipeline {
 
   guint       tick_id;
 } GSRWindowPipeline;
+#endif
 
 enum {
   PROP_0,
@@ -78,8 +79,9 @@ enum {
 
 static GtkWindowClass *parent_class = NULL;
 
-#define GSR_WINDOW_GET_PRIVATE(object)(G_TYPE_INSTANCE_GET_PRIVATE ((object), GSR_TYPE_WINDOW, GSRWindowPrivate))
+//#define GSR_WINDOW_GET_PRIVATE(object)(G_TYPE_INSTANCE_GET_PRIVATE ((object), GSR_TYPE_WINDOW, GSRWindowPrivate))
 
+#if 0
 struct _GSRWindowPrivate {
   GtkWidget *main_vbox;
   GtkWidget *scale;
@@ -143,8 +145,8 @@ struct _GSRWindowPrivate {
 
   GstElement *source;
 };
+#endif
 
-static GSRWindowPipeline * make_record_pipeline    (GSRWindow         *window);
 static GSRWindowPipeline * make_play_pipeline      (GSRWindow         *window);
 
 static void
@@ -1324,6 +1326,7 @@ play_tick_callback (GSRWindow *window)
   return TRUE;
 }
 
+#if 0
 static gboolean
 record_tick_callback (GSRWindow *window)
 {
@@ -1359,6 +1362,7 @@ record_tick_callback (GSRWindow *window)
 
   return TRUE;
 }
+#endif
 
 static void
 play_state_changed_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
@@ -1538,6 +1542,7 @@ make_play_pipeline (GSRWindow *window)
   return obj;
 }
 
+#if 0
 static void
 record_eos_msg_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
 {
@@ -1556,6 +1561,7 @@ record_eos_msg_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
 
   window->priv->has_file = TRUE;
 }
+#endif
 
 gchar*
 gsr_generate_filename (GSRWindow *window)
@@ -1579,6 +1585,7 @@ gsr_generate_filename (GSRWindow *window)
   return string;
 }
 
+#if 0
 static gboolean
 record_start (gpointer user_data) 
 {
@@ -1665,6 +1672,7 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
       break;
   }
 }
+
 
 static gboolean
 level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
@@ -1790,6 +1798,8 @@ make_record_pipeline (GSRWindow *window)
 
   return pipeline;
 }
+
+#endif
 
 static char *
 calculate_format_value (GtkScale *scale,

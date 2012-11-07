@@ -237,7 +237,7 @@ gsr_profile_get (void)
 }
 
 
-static GSRWindowPipeline *
+GSRWindowPipeline *
 make_record_pipeline (GSRWindow *window)
 {
   GSRWindowPipeline *pipeline;
@@ -275,8 +275,8 @@ make_record_pipeline (GSRWindow *window)
 
   /* We ultimately want to find out the caps on the
    * encoder's source pad */
-  g_signal_connect (pipeline->pipeline, "deep-notify::caps",
-      G_CALLBACK (pipeline_deep_notify_caps_cb), window);
+//  g_signal_connect (pipeline->pipeline, "deep-notify::caps",
+//      G_CALLBACK (pipeline_deep_notify_caps_cb), window);
 
   pipeline->bus = gst_element_get_bus (pipeline->pipeline);
 
@@ -285,7 +285,7 @@ make_record_pipeline (GSRWindow *window)
   g_signal_connect (pipeline->bus, "message::element",
       G_CALLBACK (level_message_handler_cb), window);
 
-  g_signal_connect (pipeline->bus, "message::state-changed",
+/*  g_signal_connect (pipeline->bus, "message::state-changed",
       G_CALLBACK (record_state_changed_cb), window);
 
   g_signal_connect (pipeline->bus, "message::error",
@@ -293,7 +293,7 @@ make_record_pipeline (GSRWindow *window)
 
   g_signal_connect (pipeline->bus, "message::eos",
       G_CALLBACK (record_eos_msg_cb), window);
-
+*/
   return pipeline;
 }
 
