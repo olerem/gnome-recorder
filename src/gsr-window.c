@@ -47,6 +47,7 @@
 #include <gst/pbutils/encoding-profile.h>
 
 #include "gsr-window.h"
+#include "gsr-gstreamer.h"
 
 GST_DEBUG_CATEGORY_STATIC (gsr_debug);
 #define GST_CAT_DEFAULT gsr_debug

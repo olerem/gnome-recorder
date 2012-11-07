@@ -1,6 +1,7 @@
+#ifndef __GSR_GSTREAMER_H__
+#define __GSR_GSTREAMER_H__
 
-
-typedef struct _GsrPipeline {
+typedef struct _GSRWindowPipeline {
   GstElement *pipeline;
   GstState    state;     /* last seen (async) pipeline state */
   GstBus     *bus;
@@ -10,5 +11,6 @@ typedef struct _GsrPipeline {
   GstElement *encodebin;
 
   guint       tick_id;
-} GsrPipeline;
+} GSRWindowPipeline;
 
+#endif

@@ -1,5 +1,25 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
 
+#include <glib/gi18n.h>
+#include <gio/gio.h>
+#include <gtk/gtk.h>
+#include <gst/gst.h>
+#include <gst/gstpad.h>
+#include <gst/gstdatetime.h>
+
+#include <gst/pbutils/encoding-profile.h>
+
+#include "gsr-window.h"
+#include "gsr-gstreamer.h"
 
 static void
 gsr_set_tags (GSRWindow *window)

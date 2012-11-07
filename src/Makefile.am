@@ -14,6 +14,8 @@ bin_PROGRAMS = gnome-sound-recorder
 
 gnome_sound_recorder_SOURCES =	\
 	gnome-recorder.c	\
+	gsr-gstreamer.c		\
+	gsr-gstreamer.h		\
 	gsr-window.c		\
 	gsr-window.h
 
