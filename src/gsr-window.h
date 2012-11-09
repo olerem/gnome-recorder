@@ -38,6 +38,8 @@
 
 #define GSR_WINDOW_GET_PRIVATE(object)(G_TYPE_INSTANCE_GET_PRIVATE ((object), GSR_TYPE_WINDOW, GSRWindowPrivate))
 
+#define EBUSY_TRY_AGAIN     3    /* Empirical data */
+
 struct _GSRWindowPrivate {
   GtkWidget *main_vbox;
   GtkWidget *scale;
@@ -124,5 +126,9 @@ void		gsr_window_close		(GSRWindow *window);
 gboolean	gsr_window_is_saved		(GSRWindow *window);
 gboolean	gsr_discard_confirmation_dialog	(GSRWindow *window, gboolean closing);
 gchar*		gsr_generate_filename		(GSRWindow *window);
+
+void set_action_sensitive (GSRWindow  *window, const char *name, gboolean sensitive);
+void show_error_dialog (GtkWindow *win, const gchar *dbg, const gchar * format, ...);
+char * seconds_to_full_string (guint seconds);
 
 #endif

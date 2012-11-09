@@ -17,6 +17,8 @@ typedef struct _GSRWindowPipeline {
   guint       tick_id;
 } GSRWindowPipeline;
 
-GSRWindowPipeline * make_record_pipeline (GSRWindow *window);
+void record_cb (GtkAction *action, GSRWindow *window);
+GSRWindowPipeline * make_play_pipeline (GSRWindow *window);
+void stop_cb (GtkAction *action, GSRWindow *window);
 
 #endif

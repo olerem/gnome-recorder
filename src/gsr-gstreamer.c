@@ -21,31 +21,6 @@
 #include "gsr-window.h"
 #include "gsr-gstreamer.h"
 
-static void
-gsr_set_tags (GSRWindow *window)
-{
-  GSRWindowPrivate *priv = window->priv;
-  GstPad *active_pad;
-  GstDateTime *gst_datetime;
-  GstTagList *taglist;
-
-  g_assert (priv->datetime != NULL);
-
-  gst_datetime = gst_date_time_new_from_g_date_time (priv->datetime);
-
-  taglist = gst_tag_list_new (
-      GST_TAG_APPLICATION_NAME, "gnome-sound-recorder",
-      GST_TAG_DATE_TIME, gst_datetime,
-      GST_TAG_TITLE, priv->filename,
-      GST_TAG_KEYWORDS, "gnome-sound-recorder", NULL);
-
-  active_pad = gst_element_get_static_pad (priv->record->src, "src");
-  gst_pad_push_event (active_pad,
-      gst_event_new_tag (gst_tag_list_copy (taglist)));
-
-  gst_date_time_unref (gst_datetime);
-}
-
 /* Why do we need this? when a bin changes from READY => NULL state, its
  * bus is set to flushing and we're unlikely to ever see any of its messages
  * if the bin's state reaches NULL before we/the watch in the main thread
@@ -85,30 +60,7 @@ set_pipeline_state_to_null (GstElement *pipeline)
    * rather unlikely */
 }
 
-static void
-shutdown_pipeline (GSRWindowPipeline *pipe)
-{
-  gst_bus_set_flushing (pipe->bus, TRUE);
-  gst_bus_remove_signal_watch (pipe->bus);
-  gst_element_set_state (pipe->pipeline, GST_STATE_NULL);
-  gst_object_unref (pipe->pipeline);
-  gst_object_unref (pipe->bus);
-}
-
-static gboolean
-handle_ebusy_error (GSRWindow *window)
-{
-  g_return_val_if_fail (window->priv->ebusy_pipeline != NULL, FALSE);
-
-  gst_element_set_state (window->priv->ebusy_pipeline, GST_STATE_NULL);
-  gst_element_get_state (window->priv->ebusy_pipeline, NULL, NULL, -1);
-  gst_element_set_state (window->priv->ebusy_pipeline, GST_STATE_PLAYING);
-
-  /* Try only once */
-  return FALSE;
-}
-
-static void
+void
 stop_cb (GtkAction *action,
          GSRWindow *window)
 {
@@ -137,38 +89,372 @@ stop_cb (GtkAction *action,
 }
 
 static void
-record_cb (GtkAction *action,
-           GSRWindow *window)
+pipeline_deep_notify_caps_cb (GstObject  *pipeline,
+                              GstObject  *object,
+                              GParamSpec *pspec,
+                              GSRWindow  *window)
 {
-  if (!gsr_window_is_saved(window) &&
-      !gsr_discard_confirmation_dialog (window, FALSE))
+  GSRWindowPrivate *priv;
+  GstPadDirection direction;
+
+  if (!GST_IS_PAD (object))
     return;
 
-  GSRWindowPrivate *priv = window->priv;
+  priv = window->priv;
+  if (priv->play && pipeline == GST_OBJECT_CAST (priv->play->pipeline))
+    direction = GST_PAD_SRC;
+  else if (priv->record &&
+           pipeline == GST_OBJECT_CAST (priv->record->pipeline))
+    direction = GST_PAD_SINK;
+  else
+    g_return_if_reached ();
 
-  if (priv->record)
-    shutdown_pipeline (priv->record);
 
-  if ((priv->record = make_record_pipeline (window))) {
-    priv->len_secs = 0;
-    priv->saved = FALSE;
+  if (GST_PAD_DIRECTION (object) == direction) {
+    GstObject *pad_parent;
 
-    if (priv->filename)
-      g_free (priv->filename);
+    pad_parent = gst_object_get_parent (object);
+    if (GST_IS_ELEMENT (pad_parent)) {
+      GstElementFactory *factory;
+      GstElement *element;
+      const gchar *klass;
 
-    priv->filename = gsr_generate_filename (window);
+      element = GST_ELEMENT_CAST (pad_parent);
+      if ((factory = gst_element_get_factory (element)) &&
+          (klass = gst_element_factory_get_klass (factory)) &&
+          strstr (klass, "Audio") &&
+          (strstr (klass, "Decoder") || strstr (klass, "Encoder"))) {
+        GstCaps *caps;
 
-    g_print ("%s", priv->record_filename);
-    g_object_set (G_OBJECT (priv->record->sink),
-        "location", priv->record_filename, NULL);
+        caps = gst_pad_get_current_caps (GST_PAD_CAST (object));
+        if (caps) {
+          GstStructure *s;
+          gint val;
 
-    gst_element_set_state (priv->record->pipeline, GST_STATE_PLAYING);
-    gsr_set_tags (window);
-    gtk_widget_set_sensitive (window->priv->level, TRUE);
-    gtk_widget_set_sensitive (window->priv->volume_label, TRUE);
+          s = gst_caps_get_structure (caps, 0);
+          if (gst_structure_get_int (s, "channels", &val))
+            g_atomic_int_set (&priv->atomic.n_channels, val);
+
+          if (gst_structure_get_int (s, "rate", &val))
+            g_atomic_int_set (&priv->atomic.samplerate, val);
+
+          gst_caps_unref (caps);
+        }
+      }
+    }
+
+    if (pad_parent)
+      gst_object_unref (pad_parent);
 
   }
 }
+
+static GstElement *
+notgst_element_get_toplevel (GstElement * element)
+{
+  g_return_val_if_fail (element != NULL, NULL);
+  g_return_val_if_fail (GST_IS_ELEMENT (element), NULL);
+
+  do {
+    GstElement *parent;
+
+    parent = (GstElement *) gst_element_get_parent (element);
+
+    if (parent == NULL)
+      break;
+
+    gst_object_unref (parent);
+    element = parent;
+  } while (1);
+
+  return element;
+}
+
+static gboolean
+handle_ebusy_error (GSRWindow *window)
+{
+  g_return_val_if_fail (window->priv->ebusy_pipeline != NULL, FALSE);
+
+  gst_element_set_state (window->priv->ebusy_pipeline, GST_STATE_NULL);
+  gst_element_get_state (window->priv->ebusy_pipeline, NULL, NULL, -1);
+  gst_element_set_state (window->priv->ebusy_pipeline, GST_STATE_PLAYING);
+
+  /* Try only once */
+  return FALSE;
+}
+
+static void
+pipeline_error_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
+{
+  GstElement *pipeline;
+  GError *error = NULL;
+  gchar *dbg = NULL;
+
+  g_return_if_fail (GSR_IS_WINDOW (window));
+
+  gst_message_parse_error (msg, &error, &dbg);
+  g_return_if_fail (error != NULL);
+
+  pipeline = notgst_element_get_toplevel (GST_ELEMENT (msg->src));
+
+  if (error->code == GST_RESOURCE_ERROR_BUSY) {
+    if (window->priv->ebusy_timeout_id == 0) {
+      set_action_sensitive (window, "FileSave", FALSE);
+      set_action_sensitive (window, "FileSaveAs", FALSE);
+      set_action_sensitive (window, "Play", FALSE);
+      set_action_sensitive (window, "Record", FALSE);
+
+      window->priv->ebusy_pipeline = pipeline;
+
+      window->priv->ebusy_timeout_id =
+          g_timeout_add_seconds (EBUSY_TRY_AGAIN,
+          (GSourceFunc) handle_ebusy_error, window);
+
+      g_error_free (error);
+      g_free (dbg);
+      return;
+    }
+  }
+
+  if (window->priv->ebusy_timeout_id) {
+    g_source_remove (window->priv->ebusy_timeout_id);
+    window->priv->ebusy_timeout_id = 0;
+    window->priv->ebusy_pipeline = NULL;
+  }
+
+  /* set pipeline to NULL before showing error dialog to make sure
+   * the audio device is freed, in case any accessability software
+   * wants to make use of it to read out the error message */
+  set_pipeline_state_to_null (pipeline);
+
+  show_error_dialog (GTK_WINDOW (window), dbg, "%s", error->message);
+
+  gdk_window_set_cursor (gtk_widget_get_window (window->priv->main_vbox), NULL);
+
+  set_action_sensitive (window, "Stop", FALSE);
+  set_action_sensitive (window, "Play", TRUE);
+  set_action_sensitive (window, "Record", TRUE);
+  set_action_sensitive (window, "FileSave", TRUE);
+  set_action_sensitive (window, "FileSaveAs", TRUE);
+  gtk_widget_set_sensitive (window->priv->scale, TRUE);
+
+  gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
+      window->priv->status_message_cid);
+  gtk_statusbar_push (GTK_STATUSBAR (window->priv->statusbar),
+      window->priv->status_message_cid, _("Ready"));
+
+  g_error_free (error);
+  g_free (dbg);
+}
+
+static void
+play_eos_msg_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
+{
+  g_return_if_fail (GSR_IS_WINDOW (window));
+
+  GST_DEBUG ("EOS");
+
+  stop_cb (NULL, window);
+}
+
+static gboolean
+play_tick_callback (GSRWindow *window)
+{
+  GstElement *playbin;
+  GstFormat format = GST_FORMAT_TIME;
+  gint64 val = -1;
+
+  g_return_val_if_fail (window->priv->play != NULL, FALSE);
+  g_return_val_if_fail (window->priv->play->pipeline != NULL, FALSE);
+
+  playbin = window->priv->play->pipeline;
+
+  /* This check stops us from doing an unnecessary query */
+  if (window->priv->play->state != GST_STATE_PLAYING) {
+    GST_DEBUG ("pipeline in wrong state: %s",
+        gst_element_state_get_name (window->priv->play->state));
+    window->priv->play->tick_id = 0;
+    return FALSE;
+  }
+
+  if (gst_element_query_duration (playbin, format, &val) && val != -1) {
+    gchar *len_str;
+
+    window->priv->len_secs = val / GST_SECOND;
+
+    len_str = seconds_to_full_string (window->priv->len_secs);
+    gtk_label_set_text (GTK_LABEL (window->priv->length_label), len_str);
+    g_free (len_str);
+  } else {
+    if (window->priv->get_length_attempts <= 0) {
+      /* Attempts to get length ran out. */
+      gtk_label_set_text (GTK_LABEL (window->priv->length_label), _("Unknown"));
+    } else
+      --window->priv->get_length_attempts;
+  }
+
+  if (window->priv->seek_in_progress) {
+    GST_DEBUG ("seek in progress, try again later");
+    return TRUE;
+  }
+
+  if (window->priv->len_secs == 0) {
+    GST_DEBUG ("no duration, try again later");
+    return TRUE;
+  }
+
+  if (gst_element_query_position (playbin, format, &val) && val != -1) {
+    gdouble pos, len, percentage;
+
+    pos = (gdouble) (val - (val % GST_SECOND));
+    len = (gdouble) window->priv->len_secs * GST_SECOND;
+    percentage = pos / len * 100.0;
+
+    gtk_adjustment_set_value (gtk_range_get_adjustment (GTK_RANGE (window->priv->scale)),
+        CLAMP (percentage + 0.5, 0.0, 100.0));
+  } else
+    GST_DEBUG ("failed to query position");
+
+  return TRUE;
+}
+
+static void
+play_state_changed_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
+{
+  GstState new_state;
+
+  gst_message_parse_state_changed (msg, NULL, &new_state, NULL);
+
+  g_return_if_fail (GSR_IS_WINDOW (window));
+
+  /* we are only interested in state changes of the top-level pipeline */
+  if (msg->src != GST_OBJECT (window->priv->play->pipeline))
+    return;
+
+  window->priv->play->state = new_state;
+
+  GST_DEBUG ("playbin state: %s", gst_element_state_get_name (new_state));
+
+  switch (new_state) {
+    case GST_STATE_PLAYING:
+      if (window->priv->play->tick_id == 0) {
+        window->priv->play->tick_id =
+            g_timeout_add (200, (GSourceFunc) play_tick_callback, window);
+      }
+
+      set_action_sensitive (window, "Stop", TRUE);
+      set_action_sensitive (window, "Play", FALSE);
+      set_action_sensitive (window, "Record", FALSE);
+      set_action_sensitive (window, "FileSave", FALSE);
+      set_action_sensitive (window, "FileSaveAs", FALSE);
+      gtk_widget_set_sensitive (window->priv->scale, TRUE);
+
+      gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
+          window->priv->status_message_cid);
+      gtk_statusbar_push (GTK_STATUSBAR (window->priv->statusbar),
+          window->priv->status_message_cid, _("Playing…"));
+
+      if (window->priv->ebusy_timeout_id) {
+        g_source_remove (window->priv->ebusy_timeout_id);
+        window->priv->ebusy_timeout_id = 0;
+        window->priv->ebusy_pipeline = NULL;
+      }
+      break;
+    case GST_STATE_READY:
+      if (window->priv->play->tick_id > 0) {
+        g_source_remove (window->priv->play->tick_id);
+        window->priv->play->tick_id = 0;
+      }
+      gtk_adjustment_set_value (gtk_range_get_adjustment (GTK_RANGE (window->priv->scale)), 0.0);
+      gtk_widget_set_sensitive (window->priv->scale, FALSE);
+      /* fallthrough */
+    case GST_STATE_PAUSED:
+      set_action_sensitive (window, "Stop", FALSE);
+      set_action_sensitive (window, "Play", TRUE);
+      set_action_sensitive (window, "Record", TRUE);
+      set_action_sensitive (window, "FileSave", TRUE);
+      set_action_sensitive (window, "FileSaveAs", TRUE);
+
+      gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
+          window->priv->status_message_cid);
+      gtk_statusbar_push (GTK_STATUSBAR (window->priv->statusbar),
+          window->priv->status_message_cid, _("Ready"));
+      break;
+    default:
+      break;
+  }
+}
+
+
+
+GSRWindowPipeline *
+make_play_pipeline (GSRWindow *window)
+{
+  GSRWindowPipeline *obj;
+  GstElement *playbin;
+  GstElement *audiosink;
+
+  audiosink = gst_element_factory_make ("pulsesink", NULL);
+  g_return_val_if_fail (audiosink != NULL, NULL);
+
+  playbin = gst_element_factory_make ("playbin", NULL);
+  g_return_val_if_fail (playbin != NULL, NULL);
+
+  obj = g_new0 (GSRWindowPipeline, 1);
+  obj->pipeline = playbin;
+  obj->src = NULL; /* don't need that for playback */
+  obj->sink = NULL; /* don't need that for playback */
+
+  g_object_set (playbin, "audio-sink", audiosink, NULL);
+
+  /* we ultimately want to find out the caps on the decoder's source pad */
+  g_signal_connect (playbin, "deep-notify::caps",
+      G_CALLBACK (pipeline_deep_notify_caps_cb), window);
+
+  obj->bus = gst_element_get_bus (playbin);
+
+  gst_bus_add_signal_watch_full (obj->bus, G_PRIORITY_HIGH);
+
+  g_signal_connect (obj->bus, "message::state-changed",
+      G_CALLBACK (play_state_changed_cb), window);
+
+  g_signal_connect (obj->bus, "message::error",
+      G_CALLBACK (pipeline_error_cb), window);
+
+  g_signal_connect (obj->bus, "message::eos",
+      G_CALLBACK (play_eos_msg_cb), window);
+
+  return obj;
+}
+
+static void
+gsr_set_tags (GSRWindow *window)
+{
+  GSRWindowPrivate *priv = window->priv;
+  GstPad *active_pad;
+  GstDateTime *gst_datetime;
+  GstTagList *taglist;
+
+  g_assert (priv->datetime != NULL);
+
+  gst_datetime = gst_date_time_new_from_g_date_time (priv->datetime);
+
+  taglist = gst_tag_list_new (
+      GST_TAG_APPLICATION_NAME, "gnome-sound-recorder",
+      GST_TAG_DATE_TIME, gst_datetime,
+      GST_TAG_TITLE, priv->filename,
+      GST_TAG_KEYWORDS, "gnome-sound-recorder", NULL);
+
+  active_pad = gst_element_get_static_pad (priv->record->src, "src");
+  gst_pad_push_event (active_pad,
+      gst_event_new_tag (gst_tag_list_copy (taglist)));
+
+  gst_date_time_unref (gst_datetime);
+}
+
+
+
+
 
 static gboolean
 level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
@@ -212,6 +498,149 @@ level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
   return TRUE;
 }
 
+static gboolean
+record_tick_callback (GSRWindow *window)
+{
+  GstElement *pipeline;
+  GstFormat format = GST_FORMAT_TIME;
+  gint64 val = -1;
+  gint secs;
+
+  /* This check stops us from doing an unnecessary query */
+  if (window->priv->record->state != GST_STATE_PLAYING) {
+    GST_DEBUG ("pipeline in wrong state: %s",
+    gst_element_state_get_name (window->priv->record->state));
+    return FALSE;
+  }
+
+  if (window->priv->seek_in_progress)
+    return TRUE;
+
+  pipeline = window->priv->record->pipeline;
+
+  if (gst_element_query_position (pipeline, format, &val) && val != -1) {
+    gchar* len_str;
+
+    secs = val / GST_SECOND;
+               
+    len_str = seconds_to_full_string (secs);
+    window->priv->len_secs = secs;
+    gtk_label_set_text (GTK_LABEL (window->priv->length_label),
+                                   len_str);
+    g_free (len_str);
+  } else
+    GST_DEBUG ("failed to query position");
+
+  return TRUE;
+}
+
+static gboolean
+record_start (gpointer user_data) 
+{
+  GSRWindow *window = GSR_WINDOW (user_data);
+  gchar *title;
+
+  g_assert (window->priv->tick_id == 0);
+
+  gtk_label_set_text (GTK_LABEL (window->priv->name_label),
+      window->priv->filename);
+  title = g_strdup_printf (_("%s — Sound Recorder"),
+      window->priv->filename);
+  gtk_window_set_title (GTK_WINDOW (window), title);
+
+  g_free (title);
+
+  window->priv->get_length_attempts = 16;
+  window->priv->tick_id = g_timeout_add (200, (GSourceFunc) record_tick_callback, window);
+
+  set_action_sensitive (window, "Stop", TRUE);
+  set_action_sensitive (window, "Play", FALSE);
+  set_action_sensitive (window, "Record", FALSE);
+  set_action_sensitive (window, "FileSave", FALSE);
+  set_action_sensitive (window, "FileSaveAs", FALSE);
+  gtk_widget_set_sensitive (window->priv->scale, FALSE);
+
+  gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
+      window->priv->status_message_cid);
+  gtk_statusbar_push (GTK_STATUSBAR (window->priv->statusbar),
+      window->priv->status_message_cid, _("Recording…"));
+
+  window->priv->record_id = 0;
+
+  return FALSE;
+}
+
+
+static void
+record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
+{
+  GstState  new_state;
+
+  gst_message_parse_state_changed (msg, NULL, &new_state, NULL);
+
+  g_return_if_fail (GSR_IS_WINDOW (window));
+
+  /* we are only interested in state changes of the top-level pipeline */
+  if (msg->src != GST_OBJECT (window->priv->record->pipeline))
+    return;
+
+  window->priv->record->state = new_state;
+
+  GST_DEBUG ("record pipeline state: %s",
+      gst_element_state_get_name (new_state));
+
+  switch (new_state) {
+    case GST_STATE_PLAYING:
+      window->priv->record_id = g_idle_add (record_start, window);
+      g_free (window->priv->extension);
+      window->priv->extension = g_strdup ("ogg");
+      break;
+    case GST_STATE_READY:
+      gtk_adjustment_set_value (gtk_range_get_adjustment (GTK_RANGE (window->priv->scale)), 0.0);
+      gtk_widget_set_sensitive (window->priv->scale, FALSE);
+      /* fall through */
+    case GST_STATE_PAUSED:
+      set_action_sensitive (window, "Stop", FALSE);
+      set_action_sensitive (window, "Play", TRUE);
+      set_action_sensitive (window, "Record", TRUE);
+      set_action_sensitive (window, "FileSave", TRUE);
+      set_action_sensitive (window, "FileSaveAs", TRUE);
+      gtk_widget_set_sensitive (window->priv->scale, FALSE);
+
+      gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
+          window->priv->status_message_cid);
+      gtk_statusbar_push (GTK_STATUSBAR (window->priv->statusbar),
+          window->priv->status_message_cid, _("Ready"));
+
+      if (window->priv->tick_id > 0) {
+        g_source_remove (window->priv->tick_id);
+        window->priv->tick_id = 0;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+static void
+record_eos_msg_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
+{
+  g_return_if_fail (GSR_IS_WINDOW (window));
+
+  GST_DEBUG ("EOS. Finished recording");
+
+  /* FIXME: this was READY before (why?) */
+  set_pipeline_state_to_null (window->priv->record->pipeline);
+
+  g_free (window->priv->working_file);
+  window->priv->working_file = g_strdup (window->priv->record_filename);
+
+  g_free (window->priv->filename);
+  window->priv->filename = g_strdup (window->priv->record_filename);
+
+  window->priv->has_file = TRUE;
+}
+
 //done
 static GstEncodingProfile *
 gsr_profile_get (void)
@@ -237,7 +666,7 @@ gsr_profile_get (void)
 }
 
 
-GSRWindowPipeline *
+static GSRWindowPipeline *
 make_record_pipeline (GSRWindow *window)
 {
   GSRWindowPipeline *pipeline;
@@ -275,8 +704,8 @@ make_record_pipeline (GSRWindow *window)
 
   /* We ultimately want to find out the caps on the
    * encoder's source pad */
-//  g_signal_connect (pipeline->pipeline, "deep-notify::caps",
-//      G_CALLBACK (pipeline_deep_notify_caps_cb), window);
+  g_signal_connect (pipeline->pipeline, "deep-notify::caps",
+      G_CALLBACK (pipeline_deep_notify_caps_cb), window);
 
   pipeline->bus = gst_element_get_bus (pipeline->pipeline);
 
@@ -285,7 +714,7 @@ make_record_pipeline (GSRWindow *window)
   g_signal_connect (pipeline->bus, "message::element",
       G_CALLBACK (level_message_handler_cb), window);
 
-/*  g_signal_connect (pipeline->bus, "message::state-changed",
+  g_signal_connect (pipeline->bus, "message::state-changed",
       G_CALLBACK (record_state_changed_cb), window);
 
   g_signal_connect (pipeline->bus, "message::error",
@@ -293,8 +722,50 @@ make_record_pipeline (GSRWindow *window)
 
   g_signal_connect (pipeline->bus, "message::eos",
       G_CALLBACK (record_eos_msg_cb), window);
-*/
+
   return pipeline;
 }
 
+static void
+shutdown_pipeline (GSRWindowPipeline *pipe)
+{
+  gst_bus_set_flushing (pipe->bus, TRUE);
+  gst_bus_remove_signal_watch (pipe->bus);
+  gst_element_set_state (pipe->pipeline, GST_STATE_NULL);
+  gst_object_unref (pipe->pipeline);
+  gst_object_unref (pipe->bus);
+}
 
+void
+record_cb (GtkAction *action,
+           GSRWindow *window)
+{
+  if (!gsr_window_is_saved(window) &&
+      !gsr_discard_confirmation_dialog (window, FALSE))
+    return;
+
+  GSRWindowPrivate *priv = window->priv;
+
+  if (priv->record)
+    shutdown_pipeline (priv->record);
+
+  if ((priv->record = make_record_pipeline (window))) {
+    priv->len_secs = 0;
+    priv->saved = FALSE;
+
+    if (priv->filename)
+      g_free (priv->filename);
+
+    priv->filename = gsr_generate_filename (window);
+
+    g_print ("%s", priv->record_filename);
+    g_object_set (G_OBJECT (priv->record->sink),
+        "location", priv->record_filename, NULL);
+
+    gst_element_set_state (priv->record->pipeline, GST_STATE_PLAYING);
+    gsr_set_tags (window);
+    gtk_widget_set_sensitive (window->priv->level, TRUE);
+    gtk_widget_set_sensitive (window->priv->volume_label, TRUE);
+
+  }
+}
