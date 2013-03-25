@@ -4,5 +4,5 @@
 #include "gsr-window.h"
 #include "gsr-gstreamer.h"
 
-gchar*		gsr_generate_filename		(GSRWindow *window);
+void gsr_filename_from_datetime (GSRWindowPrivate *priv);
 #endif

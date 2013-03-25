@@ -931,7 +931,7 @@ play_cb (GtkAction *action,
 {
   GSRWindowPrivate *priv = window->priv;
 
-  if (priv->has_file == FALSE && !priv->working_file)
+  if (!priv->record_filename)
     return;
 
   if (priv->play)
@@ -939,17 +939,8 @@ play_cb (GtkAction *action,
 
   if ((priv->play = make_play_pipeline (window))) {
     gchar *uri;
-    gchar *usefile;
-    GFile *file;
 
-    if(priv->has_file == FALSE && priv->working_file)
-      usefile = priv->working_file;
-    else
-      usefile = priv->filename;
-
-    file = g_file_new_for_commandline_arg (usefile);
-    uri = g_file_get_uri (file);
-    g_object_unref (file);
+    uri = g_filename_to_uri (priv->record_filename, NULL, NULL);
     g_object_set (window->priv->play->pipeline, "uri", uri, NULL);
     g_free (uri);
 

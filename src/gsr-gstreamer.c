@@ -14,6 +14,21 @@
  * our state-changed handler actually gets to see all the state changes */
 
 static void
+gsr_generate_datetime (GSRWindowPrivate *priv)
+{
+  GDateTime *datetime;
+
+  datetime = g_date_time_new_now_local ();
+  g_assert (datetime != NULL);
+
+  if (priv->datetime)
+    g_date_time_unref (priv->datetime);
+
+  priv->datetime = g_date_time_ref (datetime);
+  g_date_time_unref (datetime);
+}
+
+static void
 set_pipeline_state_to_null (GstElement *pipeline)
 {
   GstMessage *msg;
@@ -370,8 +385,6 @@ play_state_changed_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
   }
 }
 
-
-
 GSRWindowPipeline *
 make_play_pipeline (GSRWindow *window)
 {
@@ -436,10 +449,6 @@ gsr_set_tags (GSRWindow *window)
 
   gst_date_time_unref (gst_datetime);
 }
-
-
-
-
 
 static gboolean
 level_message_handler_cb (GstBus * bus, GstMessage * message, GSRWindow *window)
@@ -617,9 +626,6 @@ record_eos_msg_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
   /* FIXME: this was READY before (why?) */
   set_pipeline_state_to_null (window->priv->record->pipeline);
 
-  g_free (window->priv->working_file);
-  window->priv->working_file = g_strdup (window->priv->record_filename);
-
   g_free (window->priv->filename);
   window->priv->filename = g_strdup (window->priv->record_filename);
 
@@ -738,10 +744,8 @@ record_cb (GtkAction *action,
     priv->len_secs = 0;
     priv->saved = FALSE;
 
-    if (priv->filename)
-      g_free (priv->filename);
-
-    priv->filename = gsr_generate_filename (window);
+    gsr_generate_datetime (priv);
+    gsr_filename_from_datetime (priv);
 
     g_print ("%s", priv->record_filename);
     g_object_set (G_OBJECT (priv->record->sink),

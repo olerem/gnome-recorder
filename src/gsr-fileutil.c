@@ -6,39 +6,14 @@
 
 #include "gsr-fileutil.h"
 
-
-/* generare filename based on time stamp.
- *
- */
-
-gchar*
-gsr_generate_filename (GSRWindow *window)
+void
+gsr_filename_from_datetime (GSRWindowPrivate *priv)
 {
-  gchar *string;
-  GDateTime *datetime;
+  gchar *filename;
+  const gchar *path;
 
-  datetime = g_date_time_new_now_local ();
-  g_assert (datetime != NULL);
-
-  if (window) {
-    if (window->priv->datetime)
-      g_date_time_unref (window->priv->datetime);
-
-    window->priv->datetime = g_date_time_ref (datetime);
-  }
-
-  string = g_date_time_format (datetime, "%Y-%m-%d-%H%M%S");
-  g_date_time_unref (datetime);
-
-  return string;
-}
-
-#if 0
-gsr_get_folder_path ()
-{
   // optinal read g_setting
   //GSettings *settings;
-  gcahr *path;
 
   //settings = g_settings_new ("org.gnome.Gsr");
 
@@ -51,11 +26,23 @@ gsr_get_folder_path ()
     /* this should not be freed */
     path = g_get_user_special_dir (G_USER_DIRECTORY_MUSIC);
     /* this should be freed */
+    /* TODO: we should check if folder exist */
     priv->audio_path = g_build_filename (path, "Records", NULL);
     if (strcmp (priv->audio_path, "") == 0)
     {
-      gprint("still no path!!!\n");
+      g_print("still no path!!!\n");
     }
   }
+  /* we support only ogg. No need to bother about different file extensions */
+  filename = g_date_time_format (priv->datetime, "%Y-%m-%d-%H%M%S.ogg");
+
+  g_free (priv->record_filename);
+  priv->record_filename = g_build_filename (priv->audio_path, filename, NULL);
+
+
 }
-#endif
+
+/* generare filename based on time stamp.
+ *
+ */
+
