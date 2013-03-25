@@ -55,8 +55,6 @@ GST_DEBUG_CATEGORY_STATIC (gsr_debug);
 extern GtkWidget * gsr_open_window (const char *filename);
 extern void gsr_quit (void);
 
-extern void gsr_add_recent (gchar *filename);
-
 enum {
   PROP_0,
   PROP_LOCATION
@@ -1360,8 +1358,6 @@ gsr_window_set_property (GObject      *object,
       utf8_name = g_filename_to_utf8 (short_name, -1, NULL, NULL, NULL);
       if (priv->name_label != NULL)
         gtk_label_set_text (GTK_LABEL (priv->name_label), utf8_name);
-
-      gsr_add_recent (priv->filename);
 
       /* Translators: this is the window title,
        * %s is the currently open file's name or Untitled*/

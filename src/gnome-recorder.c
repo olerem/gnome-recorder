@@ -35,7 +35,6 @@
 #include "gsr-window.h"
 
 void gsr_quit (void);
-void gsr_add_recent (gchar *filename);
 GtkWidget * gsr_open_window (const char *filename);
 
 static GList *windows = NULL;
@@ -79,44 +78,6 @@ gsr_quit (void)
         gsr_discard_confirmation_dialog (window, TRUE))
       gsr_window_close (window);
   }
-}
-
-void
-gsr_add_recent (gchar *filename)
-{
-  GtkRecentData data;
-  char *groups[] = { NULL, NULL };
-  char *uri;
-
-  memset (&data, 0, sizeof (data));
-
-  uri = g_filename_to_uri (filename, NULL, NULL);
-  if (uri == NULL)
-    return;
-
-  data.mime_type = g_content_type_guess (uri, NULL, 0, NULL);
-  if (data.mime_type == NULL) {
-    /* No mime-type means warnings, and it breaks when adding
-     * non-GIO supported URI schemes */
-    g_free (uri);
-    return;
-  }
-
-  /* It's a local file */
-  data.display_name = g_filename_display_basename (data.display_name);
-  groups[0] = "Totem";
-
-  data.app_name = g_strdup (g_get_application_name ());
-  data.app_exec = g_strjoin (" ", g_get_prgname (), "%u", NULL);
-  data.groups = groups;
-  gtk_recent_manager_add_full (gtk_recent_manager_get_default (),
-				     uri, &data);
-
-  g_free (data.display_name);
-  g_free (data.mime_type);
-  g_free (data.app_name);
-  g_free (data.app_exec);
-
 }
 
 GtkWidget *
