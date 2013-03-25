@@ -994,28 +994,6 @@ seek_to (GtkRange *range,
   return FALSE;
 }
 
-gchar*
-gsr_generate_filename (GSRWindow *window)
-{
-  gchar *string;
-  GDateTime *datetime;
-
-  datetime = g_date_time_new_now_local ();
-  g_assert (datetime != NULL);
-
-  if (window) {
-    if (window->priv->datetime)
-      g_date_time_unref (window->priv->datetime);
-
-    window->priv->datetime = g_date_time_ref (datetime);
-  }
-
-  string = g_date_time_format (datetime, "%Y-%m-%d-%H%M%S");
-  g_date_time_unref (datetime);
-
-  return string;
-}
-
 static char *
 calculate_format_value (GtkScale *scale,
 			double value,

@@ -125,7 +125,6 @@ GtkWidget*	gsr_window_new			(const char *filename);
 void		gsr_window_close		(GSRWindow *window);
 gboolean	gsr_window_is_saved		(GSRWindow *window);
 gboolean	gsr_discard_confirmation_dialog	(GSRWindow *window, gboolean closing);
-gchar*		gsr_generate_filename		(GSRWindow *window);
 
 void set_action_sensitive (GSRWindow  *window, const char *name, gboolean sensitive);
 void show_error_dialog (GtkWindow *win, const gchar *dbg, const gchar * format, ...);
