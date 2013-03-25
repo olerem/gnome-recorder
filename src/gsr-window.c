@@ -1460,7 +1460,6 @@ gsr_window_finalize (GObject *object)
     g_free (priv->record);
   }
 
-  unlink (priv->record_filename);
   g_free (priv->record_filename);
 
   g_free (priv->working_file);
