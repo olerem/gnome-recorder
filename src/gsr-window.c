@@ -652,25 +652,16 @@ fill_in_information (GSRWindow *window,
   gchar *utf8_name = NULL;
   gint n_channels, bitrate, samplerate;
 
-  /* dirname */
-  if (window->priv->dirty)
-    gtk_label_set_text (GTK_LABEL (fp->dirname), "");
-  else {
-    name = g_path_get_dirname (window->priv->filename);
-    text = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-    gtk_label_set_text (GTK_LABEL (fp->dirname), text);
-    g_free (text);
-    g_free (name);
-  }
+  name = g_path_get_dirname (window->priv->record_filename);
+  text = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
+  gtk_label_set_text (GTK_LABEL (fp->dirname), text);
+  g_free (text);
+  g_free (name);
 
   /* filename */
-  name = g_path_get_basename (window->priv->filename);
+  name = g_path_get_basename (window->priv->record_filename);
   utf8_name = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-
-  if (window->priv->dirty)
-    text = g_strdup_printf (_("%s (Has not been saved)"), utf8_name);
-  else
-    text = g_strdup (utf8_name);
+  text = g_strdup (utf8_name);
 
   gtk_label_set_text (GTK_LABEL (fp->filename), text);
   g_free (text);
@@ -678,7 +669,7 @@ fill_in_information (GSRWindow *window,
   g_free (name);
 	
   /* Size */
-  if (stat (window->priv->working_file, &buf) == 0) {
+  if (stat (window->priv->record_filename, &buf) == 0) {
     gchar *human;
 
     file_size = (guint64) buf.st_size;
@@ -1350,10 +1341,8 @@ gsr_window_set_property (GObject      *object,
       }
 
       g_free (priv->filename);
-      g_free (priv->working_file);
 
       priv->filename = g_value_dup_string (value);
-      priv->working_file = g_strdup (priv->filename);
       priv->len_secs = 0;
 
       short_name = g_path_get_basename (priv->filename);
@@ -1462,7 +1451,6 @@ gsr_window_finalize (GObject *object)
 
   g_free (priv->record_filename);
 
-  g_free (priv->working_file);
   g_free (priv->filename);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
@@ -1541,14 +1529,6 @@ gsr_window_new (const char *filename)
       &window->priv->record_filename, NULL);
   g_free (template);
   close (window->priv->record_fd);
-
-  if (window->priv->has_file == FALSE) {
-    g_free (window->priv->working_file);
-    window->priv->working_file = g_strdup (window->priv->record_filename);
-  } else {
-    g_free (window->priv->working_file);
-    window->priv->working_file = g_strdup (filename);
-  }
 
   window->priv->saved = TRUE;
 

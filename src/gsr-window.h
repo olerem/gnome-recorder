@@ -71,9 +71,7 @@ struct _GSRWindowPrivate {
   gchar *audio_path;
   char *filename;
   char *extension;
-  char *working_file; /* Working file: Operations only occur on the
-                         working file. The result of that operation then
-                         becomes the new working file. */
+
   int record_fd;
 
   /* File info */
