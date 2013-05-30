@@ -88,7 +88,6 @@ struct _GSRWindowPrivate {
   } atomic;
 
   gboolean has_file;
-  gboolean saved;
   gboolean dirty;
   gboolean seek_in_progress;
 
@@ -122,7 +121,6 @@ GType		gsr_window_get_type		(void);
 
 GtkWidget*	gsr_window_new			(const char *filename);
 void		gsr_window_close		(GSRWindow *window);
-gboolean	gsr_window_is_saved		(GSRWindow *window);
 gboolean	gsr_discard_confirmation_dialog	(GSRWindow *window, gboolean closing);
 
 void set_action_sensitive (GSRWindow  *window, const char *name, gboolean sensitive);

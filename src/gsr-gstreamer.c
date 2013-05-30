@@ -731,10 +731,6 @@ void
 record_cb (GtkAction *action,
            GSRWindow *window)
 {
-  if (!gsr_window_is_saved(window) &&
-      !gsr_discard_confirmation_dialog (window, FALSE))
-    return;
-
   GSRWindowPrivate *priv = window->priv;
 
   if (priv->record)
@@ -742,7 +738,6 @@ record_cb (GtkAction *action,
 
   if ((priv->record = make_record_pipeline (window))) {
     priv->len_secs = 0;
-    priv->saved = FALSE;
 
     gsr_generate_datetime (priv);
     gsr_filename_from_datetime (priv);
