@@ -232,279 +232,6 @@ set_action_sensitive (GSRWindow  *window,
 }
 
 static void
-file_new_cb (GtkAction *action,
-	     GSRWindow *window)
-{
-  gsr_open_window (NULL);
-}
-
-static void
-file_open_cb (GtkAction *action,
-	      GSRWindow *window)
-{
-  GtkWidget *file_chooser;
-  gint response;
-
-  g_return_if_fail (GSR_IS_WINDOW (window));
-
-  file_chooser = gtk_file_chooser_dialog_new (_("Open a File"),
-      GTK_WINDOW (window),
-      GTK_FILE_CHOOSER_ACTION_OPEN,
-      GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-      GTK_STOCK_OPEN, GTK_RESPONSE_OK, NULL);
-
-  response = gtk_dialog_run (GTK_DIALOG (file_chooser));
-
-  if (response == GTK_RESPONSE_OK) {
-    gchar *name;
-    gchar *utf8_name = NULL;
-
-    name = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_chooser));
-    if (name) {
-      utf8_name = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-      g_free (utf8_name);
-
-      if (window->priv->has_file == TRUE) {
-        /* Just open a new window with the file */
-        gsr_open_window (name);
-      } else {
-        /* Set the file in this window */
-        g_object_set (G_OBJECT (window), "location", name, NULL);
-            window->priv->dirty = FALSE;
-      }
-      g_free (name);
-    }
-  }
-  gtk_widget_destroy (file_chooser);
-}
-
-static void
-file_open_recent_cb (GtkRecentChooser *chooser,
-		     GSRWindow *window)
-{
-  gchar *uri;
-  gchar *filename;
-
-  uri = gtk_recent_chooser_get_current_uri (chooser);
-  g_return_if_fail (uri != NULL);
-
-  if (!g_str_has_prefix (uri, "file://"))
-    return;
-
-  filename = g_filename_from_uri (uri, NULL, NULL);
-  if (filename == NULL)
-    goto out;
-
-  if (!g_file_test (filename, G_FILE_TEST_EXISTS)) {
-    gchar *filename_utf8;
-    GtkWidget *dlg;
-
-    filename_utf8 = g_filename_to_utf8 (filename, -1, NULL, NULL, NULL);
-    dlg = gtk_message_dialog_new (GTK_WINDOW (window),
-        GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR,
-        GTK_BUTTONS_OK, _("Unable to load file:\n%s"), filename_utf8);
-
-    gtk_widget_show (dlg);
-    gtk_dialog_run (GTK_DIALOG (dlg));
-    gtk_widget_destroy (dlg);
-
-    gtk_recent_manager_remove_item (gtk_recent_manager_get_default (), uri, NULL);
-
-    g_free (filename_utf8);
-    goto out;
-  }
-
-  if (window->priv->has_file == TRUE) {
-    /* Just open a new window with the file */
-    gsr_open_window (filename);
-  } else {
-    /* Set the file in this window */
-    g_object_set (G_OBJECT (window), "location", filename, NULL);
-        window->priv->dirty = FALSE;
-  }
-
-out:
-  g_free (filename);
-  g_free (uri);
-}
-
-static GtkWidget *
-gsr_dialog_add_button (GtkDialog *dialog,
-		       const gchar *text,
-		       const gchar *stock_id,
-		       gint response_id)
-{
-  GtkWidget *button;
-
-  g_return_val_if_fail (GTK_IS_DIALOG (dialog), NULL);
-  g_return_val_if_fail (text != NULL, NULL);
-  g_return_val_if_fail (stock_id != NULL, NULL);
-
-  button = gtk_button_new_with_mnemonic (text);
-  gtk_button_set_image (GTK_BUTTON (button),
-      gtk_image_new_from_stock (stock_id, GTK_ICON_SIZE_BUTTON));
-
-  gtk_widget_set_can_default (button, TRUE);
-
-  gtk_widget_show (button);
-
-  gtk_dialog_add_action_widget (dialog, button, response_id);
-
-  return button;
-}
-
-static gboolean
-replace_dialog (GtkWindow *parent,
-		const gchar *message,
-		const gchar *file_name)
-{
-  GtkWidget *message_dialog;
-  gint ret;
-
-  g_return_val_if_fail (file_name != NULL, FALSE);
-
-  message_dialog = gtk_message_dialog_new (parent,
-      GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_QUESTION,
-      GTK_BUTTONS_NONE, message, file_name);
-  /* Add cancel button */
-  gtk_dialog_add_button (GTK_DIALOG (message_dialog),
-      GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL);
-  /* Add replace button */
-  gsr_dialog_add_button (GTK_DIALOG (message_dialog), _("_Replace"),
-      GTK_STOCK_REFRESH, GTK_RESPONSE_YES);
-
-  gtk_dialog_set_default_response (GTK_DIALOG (message_dialog), GTK_RESPONSE_CANCEL);
-  gtk_window_set_resizable (GTK_WINDOW (message_dialog), FALSE);
-  ret = gtk_dialog_run (GTK_DIALOG (message_dialog));
-  gtk_widget_destroy (GTK_WIDGET (message_dialog));
-
-  return (ret == GTK_RESPONSE_YES);
-}
-
-static gboolean
-replace_existing_file (GtkWindow *parent,
-		      const gchar *file_name) 
-{
-  return replace_dialog (parent,
-      _("A file named \"%s\" already exists. \n"
-        "Do you want to replace it with the "
-        "one you are saving?"), file_name);
-}
-
-static void
-do_save_file (GSRWindow *window,
-	      const char *_name)
-{
-  GSRWindowPrivate *priv;
-  char *name;
-  GFile *src, *dst;
-  GError *error = NULL;
-
-  priv = window->priv;
-
-  if (window->priv->extension == NULL ||
-      g_str_has_suffix (_name, window->priv->extension))
-    name = g_strdup (_name);
-  else
-    name = g_strdup_printf ("%s.%s", _name, window->priv->extension);
-
-  if (g_file_test (name, G_FILE_TEST_EXISTS)) {
-    char *utf8_name;
-    utf8_name = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-
-    if (!replace_existing_file (GTK_WINDOW (window), utf8_name)) {
-      g_free (utf8_name);
-      return;
-    }
-
-    g_free (utf8_name);
-  }
-
-  src = g_file_new_for_path(priv->record_filename);
-  dst = g_file_new_for_path(name);
-
-  /* TODO: Show progress? Where? */
-  if (g_file_copy(src, dst, G_FILE_COPY_OVERWRITE,
-      NULL, NULL, NULL, &error)) {
-    g_object_set (G_OBJECT (window), "location", name, NULL);
-    priv->dirty = FALSE;
-
-    if (window->priv->quit_after_save == TRUE)
-      gsr_window_close (window);
-
-  } else {
-    char *utf8_name;
-    utf8_name = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-    show_error_dialog (GTK_WINDOW (window), NULL,
-        _("Could not save the file \"%s\""), utf8_name);
-    g_free (utf8_name);
-  }
-
-  g_object_unref(src);
-  g_object_unref(dst);
-  g_free (name);
-}
-
-static void
-file_save_as_cb (GtkAction *action,
-		 GSRWindow *window)
-{
-  GtkWidget *file_chooser;
-  gint response;
-
-  g_return_if_fail (GSR_IS_WINDOW (window));
-
-  file_chooser = gtk_file_chooser_dialog_new (_("Save file as"),
-      GTK_WINDOW (window), GTK_FILE_CHOOSER_ACTION_SAVE,
-      GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, GTK_STOCK_SAVE, GTK_RESPONSE_OK,
-      NULL);
-
-  if (window->priv->filename != NULL) {
-    char *locale_basename;
-    char *basename = NULL;
-    gchar *filename, *filename_ext, *extension;
-    gint length;
-
-    locale_basename = g_path_get_basename (window->priv->filename);
-    basename = g_filename_to_utf8 (locale_basename, -1, NULL, NULL, NULL);
-    length = strlen (basename);
-    extension = g_strrstr (basename, ".");
-
-    if (extension != NULL)
-      length = length - strlen (extension);
-
-    filename = g_strndup (basename,length);
-    if (window->priv->extension)
-      filename_ext = g_strdup_printf ("%s.%s", filename,
-          window->priv->extension);
-    else
-      filename_ext = g_strdup (filename);
-
-    gtk_file_chooser_set_current_name (GTK_FILE_CHOOSER (file_chooser),
-        filename_ext);
-
-    g_free (filename);
-    g_free (filename_ext);
-    g_free (basename);
-    g_free (locale_basename);
-  }
-
-  response = gtk_dialog_run (GTK_DIALOG (file_chooser));
-
-  if (response == GTK_RESPONSE_OK) {
-    gchar *name;
-
-    name = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_chooser));
-    if (name) {
-      do_save_file (window, name);
-      g_free (name);
-    }
-  }
-
-  gtk_widget_destroy (file_chooser);
-}
-
-static void
 run_mixer_cb (GtkAction *action,
 	       GSRWindow *window)
 {
@@ -803,13 +530,6 @@ gsr_window_close (GSRWindow *window)
 }
 
 static void
-file_close_cb (GtkAction *action,
-	       GSRWindow *window)
-{
-  gsr_window_close (window);
-}
-
-static void
 quit_cb (GtkAction *action,
 	 GSRWindow *window)
 {
@@ -934,22 +654,11 @@ static const GtkActionEntry menu_entries[] =
 {
   /* File menu.  */
   { "File", NULL, N_("_File") },
-  { "FileNew", GTK_STOCK_NEW, NULL, NULL,
-      N_("Create a new sample"), G_CALLBACK (file_new_cb) },
-  { "FileOpen", GTK_STOCK_OPEN, NULL, NULL,
-      N_("Open a file"), G_CALLBACK (file_open_cb) },
-  { "FileSave", GTK_STOCK_SAVE, NULL, NULL,
-      N_("Save the current file"), G_CALLBACK (file_save_as_cb) },
-  { "FileSaveAs", GTK_STOCK_SAVE_AS, NULL, "<shift><control>S",
-      N_("Save the current file with a different name"),
-      G_CALLBACK (file_save_as_cb) },
   { "RunMixer", GTK_STOCK_EXECUTE, N_("Open Volu_me Control"), NULL,
       N_("Open the audio mixer"), G_CALLBACK (run_mixer_cb) },
   { "FileProperties", GTK_STOCK_PROPERTIES, NULL, "<control>I",
       N_("Show information about the current file"),
       G_CALLBACK (file_properties_cb) },
-  { "FileClose", GTK_STOCK_CLOSE, NULL, NULL,
-      N_("Close the current file"), G_CALLBACK (file_close_cb) },
   { "Quit", GTK_STOCK_QUIT, NULL, NULL,
       N_("Quit the program"), G_CALLBACK (quit_cb) },
 
@@ -1058,7 +767,6 @@ gsr_window_init (GSRWindow *window)
   GtkWidget *align;
   GtkWidget *frame;
   gchar *path;
-  GtkAction *action;
   GtkShadowType shadow_type;
   window->priv = GSR_WINDOW_GET_PRIVATE (window);
   priv = window->priv;
@@ -1100,15 +808,6 @@ gsr_window_init (GSRWindow *window)
   gtk_ui_manager_insert_action_group (priv->ui_manager, priv->action_group, 0);
 
   /* set short labels to use in the toolbar */
-  action = gtk_action_group_get_action (priv->action_group, "FileOpen");
-  g_object_set (action, "short_label", _("Open"), NULL);
-  action = gtk_action_group_get_action (priv->action_group, "FileSave");
-  g_object_set (action, "short_label", _("Save"), NULL);
-  action = gtk_action_group_get_action (priv->action_group, "FileSaveAs");
-  g_object_set (action, "short_label", _("Save As"), NULL);
-
-  set_action_sensitive (window, "FileSave", FALSE);
-  set_action_sensitive (window, "FileSaveAs", FALSE);
   set_action_sensitive (window, "Play", FALSE);
   set_action_sensitive (window, "Stop", FALSE);
 
@@ -1120,15 +819,6 @@ gsr_window_init (GSRWindow *window)
   gtk_toolbar_set_show_arrow (GTK_TOOLBAR (toolbar), FALSE);
   gtk_box_pack_start (GTK_BOX (main_vbox), toolbar, FALSE, FALSE, 0);
   gtk_widget_show (toolbar);
-
-  priv->recent_view = gtk_recent_chooser_menu_new ();
-  gtk_recent_chooser_set_local_only (GTK_RECENT_CHOOSER (priv->recent_view), TRUE);
-  gtk_recent_chooser_set_limit (GTK_RECENT_CHOOSER (priv->recent_view), 5);
-  priv->recent_filter = gtk_recent_filter_new ();
-  gtk_recent_filter_add_application (priv->recent_filter, g_get_application_name ());
-  gtk_recent_chooser_set_filter (GTK_RECENT_CHOOSER (priv->recent_view), priv->recent_filter);
-  g_signal_connect (priv->recent_view, "item-activated",
-      G_CALLBACK (file_open_recent_cb), window);
 
   /* window content: hscale, labels, etc */
   content_vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 7);
@@ -1310,9 +1000,6 @@ gsr_window_set_property (GObject      *object,
           window->priv->has_file ? TRUE : FALSE);
       set_action_sensitive (window, "Stop", FALSE);
       set_action_sensitive (window, "Record", TRUE);
-      set_action_sensitive (window, "FileSave",
-          window->priv->has_file ? TRUE : FALSE);
-      set_action_sensitive (window, "FileSaveAs", TRUE);
       break;
     default:
       break;

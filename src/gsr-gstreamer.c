@@ -199,8 +199,6 @@ pipeline_error_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
 
   if (error->code == GST_RESOURCE_ERROR_BUSY) {
     if (window->priv->ebusy_timeout_id == 0) {
-      set_action_sensitive (window, "FileSave", FALSE);
-      set_action_sensitive (window, "FileSaveAs", FALSE);
       set_action_sensitive (window, "Play", FALSE);
       set_action_sensitive (window, "Record", FALSE);
 
@@ -234,8 +232,6 @@ pipeline_error_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
   set_action_sensitive (window, "Stop", FALSE);
   set_action_sensitive (window, "Play", TRUE);
   set_action_sensitive (window, "Record", TRUE);
-  set_action_sensitive (window, "FileSave", TRUE);
-  set_action_sensitive (window, "FileSaveAs", TRUE);
   gtk_widget_set_sensitive (window->priv->scale, TRUE);
 
   gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
@@ -345,8 +341,6 @@ play_state_changed_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
       set_action_sensitive (window, "Stop", TRUE);
       set_action_sensitive (window, "Play", FALSE);
       set_action_sensitive (window, "Record", FALSE);
-      set_action_sensitive (window, "FileSave", FALSE);
-      set_action_sensitive (window, "FileSaveAs", FALSE);
       gtk_widget_set_sensitive (window->priv->scale, TRUE);
 
       gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
@@ -372,8 +366,6 @@ play_state_changed_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
       set_action_sensitive (window, "Stop", FALSE);
       set_action_sensitive (window, "Play", TRUE);
       set_action_sensitive (window, "Record", TRUE);
-      set_action_sensitive (window, "FileSave", TRUE);
-      set_action_sensitive (window, "FileSaveAs", TRUE);
 
       gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
           window->priv->status_message_cid);
@@ -550,8 +542,6 @@ record_start (gpointer user_data)
   set_action_sensitive (window, "Stop", TRUE);
   set_action_sensitive (window, "Play", FALSE);
   set_action_sensitive (window, "Record", FALSE);
-  set_action_sensitive (window, "FileSave", FALSE);
-  set_action_sensitive (window, "FileSaveAs", FALSE);
   gtk_widget_set_sensitive (window->priv->scale, FALSE);
 
   gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
@@ -597,8 +587,6 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
       set_action_sensitive (window, "Stop", FALSE);
       set_action_sensitive (window, "Play", TRUE);
       set_action_sensitive (window, "Record", TRUE);
-      set_action_sensitive (window, "FileSave", TRUE);
-      set_action_sensitive (window, "FileSaveAs", TRUE);
       gtk_widget_set_sensitive (window->priv->scale, FALSE);
 
       gtk_statusbar_pop (GTK_STATUSBAR (window->priv->statusbar),
