@@ -48,6 +48,7 @@
 
 #include "gsr-window.h"
 #include "gsr-gstreamer.h"
+#include "gsr-fileutil.h"
 
 GST_DEBUG_CATEGORY_STATIC (gsr_debug);
 #define GST_CAT_DEFAULT gsr_debug
@@ -229,6 +230,27 @@ set_action_sensitive (GSRWindow  *window,
   GtkAction *action = gtk_action_group_get_action (window->priv->action_group,
                                                    name);
   gtk_action_set_sensitive (action, sensitive);
+}
+
+static void
+open_folder_cb (GtkAction *action,
+		GSRWindow *window)
+{
+  GSRWindowPrivate *priv = window->priv;
+
+  GError *error = NULL;
+  gchar *uri;
+
+  uri = g_filename_to_uri (priv->audio_path, NULL, NULL);
+
+  gtk_show_uri (gtk_window_get_screen (GTK_WINDOW (window)), uri,
+      gtk_get_current_event_time (), &error);
+
+  if (error != NULL) {
+    g_warning ("%s", error->message);
+    g_error_free (error);
+  }
+  g_free (uri);
 }
 
 static void
@@ -654,6 +676,8 @@ static const GtkActionEntry menu_entries[] =
 {
   /* File menu.  */
   { "File", NULL, N_("_File") },
+  { "OpenFolder", GTK_STOCK_EXECUTE, N_("Open Folder"), NULL,
+      N_("Open folder with records"), G_CALLBACK (open_folder_cb) },
   { "RunMixer", GTK_STOCK_EXECUTE, N_("Open Volu_me Control"), NULL,
       N_("Open the audio mixer"), G_CALLBACK (run_mixer_cb) },
   { "FileProperties", GTK_STOCK_PROPERTIES, NULL, "<control>I",
@@ -770,6 +794,8 @@ gsr_window_init (GSRWindow *window)
   GtkShadowType shadow_type;
   window->priv = GSR_WINDOW_GET_PRIVATE (window);
   priv = window->priv;
+
+  gsr_set_audio_path (priv);
 
   main_vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
   gtk_container_add (GTK_CONTAINER (window), main_vbox);

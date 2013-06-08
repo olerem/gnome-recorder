@@ -2,6 +2,7 @@
 
   <menubar name="MenuBar">
     <menu name="FileMenu" action="File">
+      <menuitem action="OpenFolder"/>
       <menuitem action="RunMixer"/>
       <menuitem action="FileProperties"/>
       <separator/>
