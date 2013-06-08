@@ -7,11 +7,9 @@
 #include "gsr-fileutil.h"
 
 void
-gsr_filename_from_datetime (GSRWindowPrivate *priv)
+gsr_set_audio_path (GSRWindowPrivate *priv)
 {
-  gchar *filename;
   const gchar *path;
-
   // optinal read g_setting
   //GSettings *settings;
 
@@ -33,16 +31,19 @@ gsr_filename_from_datetime (GSRWindowPrivate *priv)
       g_print("still no path!!!\n");
     }
   }
-  /* we support only ogg. No need to bother about different file extensions */
-  filename = g_date_time_format (priv->datetime, "%Y-%m-%d-%H%M%S.ogg");
-
-  g_free (priv->record_filename);
-  priv->record_filename = g_build_filename (priv->audio_path, filename, NULL);
-
-
 }
 
 /* generare filename based on time stamp.
  *
  */
+void
+gsr_filename_from_datetime (GSRWindowPrivate *priv)
+{
+  gchar *filename;
 
+  /* we support only ogg. No need to bother about different file extensions */
+  filename = g_date_time_format (priv->datetime, "%Y-%m-%d-%H%M%S.ogg");
+
+  g_free (priv->record_filename);
+  priv->record_filename = g_build_filename (priv->audio_path, filename, NULL);
+}
