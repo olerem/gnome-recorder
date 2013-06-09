@@ -70,7 +70,6 @@ struct _GSRWindowPrivate {
   gchar *record_filename;
   gchar *basename;
   gchar *audio_path;
-  char *filename;
 
   /* File info */
   int len_secs; /* In seconds */

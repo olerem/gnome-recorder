@@ -609,9 +609,6 @@ record_eos_msg_cb (GstBus * bus, GstMessage * msg, GSRWindow * window)
   /* FIXME: this was READY before (why?) */
   set_pipeline_state_to_null (window->priv->record->pipeline);
 
-  g_free (window->priv->filename);
-  window->priv->filename = g_strdup (window->priv->record_filename);
-
   window->priv->has_file = TRUE;
 }
 

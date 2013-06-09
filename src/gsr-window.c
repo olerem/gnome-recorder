@@ -1009,8 +1009,6 @@ gsr_window_finalize (GObject *object)
 
   g_free (priv->record_filename);
 
-  g_free (priv->filename);
-
   G_OBJECT_CLASS (parent_class)->finalize (object);
 
   window->priv = NULL;
