@@ -959,64 +959,6 @@ gsr_window_init (GSRWindow *window)
 }
 
 static void
-gsr_window_set_property (GObject      *object,
-			 guint         prop_id,
-			 const GValue *value,
-			 GParamSpec   *pspec)
-{
-  GSRWindow *window;
-  GSRWindowPrivate *priv;
-  struct stat buf;
-
-  window = GSR_WINDOW (object);
-  priv = window->priv;
-
-  switch (prop_id) {
-    case PROP_LOCATION:
-      if (priv->filename != NULL) {
-        if (g_value_get_string (value) == NULL)
-          return;
-        if (g_str_equal (g_value_get_string (value), priv->filename))
-          return;
-      }
-
-      g_free (priv->filename);
-
-      priv->filename = g_value_dup_string (value);
-      priv->len_secs = 0;
-
-      if (stat (priv->filename, &buf) == 0)
-        priv->has_file = TRUE;
-      else
-        priv->has_file = FALSE;
-
-      set_action_sensitive (window, "Play",
-          priv->has_file ? TRUE : FALSE);
-      set_action_sensitive (window, "Stop", FALSE);
-      set_action_sensitive (window, "Record", TRUE);
-      break;
-    default:
-      break;
-  }
-}
-
-static void
-gsr_window_get_property (GObject    *object,
-			 guint       prop_id,
-			 GValue     *value,
-			 GParamSpec *pspec)
-{
-  switch (prop_id) {
-    case PROP_LOCATION:
-      g_value_set_string (value, GSR_WINDOW (object)->priv->filename);
-      break;
-
-    default:
-      break;
-  }
-}
-
-static void
 gsr_window_finalize (GObject *object)
 {
   GSRWindow *window;
@@ -1082,22 +1024,12 @@ gsr_window_class_init (GSRWindowClass *klass)
   object_class = G_OBJECT_CLASS (klass);
 
   object_class->finalize = gsr_window_finalize;
-  object_class->set_property = gsr_window_set_property;
-  object_class->get_property = gsr_window_get_property;
 
   parent_class = g_type_class_peek_parent (klass);
 
-  g_object_class_install_property (object_class,
-      PROP_LOCATION, g_param_spec_string ("location", "Location", "",
-      /* Translator comment: default trackname is 'untitled', which
-       * has as effect that the user cannot save to this file. The
-       * 'save' action will open the save-as dialog instead to give
-       * a proper filename. See gnome-record.c:94. */
-      _("Untitled"), G_PARAM_READWRITE));
-
   g_type_class_add_private (object_class, sizeof (GSRWindowPrivate));
 
-  GST_DEBUG_CATEGORY_INIT (gsr_debug, "gsr", 0, "Gnome Sound Recorder");
+  GST_DEBUG_CATEGORY_INIT (gsr_debug, "gsr", 0, "Gnome Recorder");
 }
 
 GType
