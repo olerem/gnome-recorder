@@ -443,7 +443,7 @@ file_properties_cb (GtkAction *action,
   GtkWidget *dialog, *vbox, *inner_vbox, *hbox, *table, *label;
   char *title, *shortname;
   struct _file_props *fp;
-  shortname = g_path_get_basename (window->priv->filename);
+  shortname = g_path_get_basename (window->priv->record_filename);
   title = g_strdup_printf (_("%s Information"), shortname);
   g_free (shortname);
 
@@ -977,9 +977,6 @@ gsr_window_set_property (GObject      *object,
   GSRWindow *window;
   GSRWindowPrivate *priv;
   struct stat buf;
-  char *title, *short_name;
-  char *utf8_name = NULL;
-  const char *ext;
 
   window = GSR_WINDOW (object);
   priv = window->priv;
@@ -998,32 +995,13 @@ gsr_window_set_property (GObject      *object,
       priv->filename = g_value_dup_string (value);
       priv->len_secs = 0;
 
-      short_name = g_path_get_basename (priv->filename);
       if (stat (priv->filename, &buf) == 0)
-        window->priv->has_file = TRUE;
+        priv->has_file = TRUE;
       else
-        window->priv->has_file = FALSE;
-
-      g_free (window->priv->extension);
-      if ((ext = strrchr (short_name, '.')) && ext[1] != '\0')
-        window->priv->extension = g_strdup (&ext[1]);
-      else
-        window->priv->extension = NULL;
-
-      utf8_name = g_filename_to_utf8 (short_name, -1, NULL, NULL, NULL);
-      if (priv->name_label != NULL)
-        gtk_label_set_text (GTK_LABEL (priv->name_label), utf8_name);
-
-      /* Translators: this is the window title,
-       * %s is the currently open file's name or Untitled*/
-      title = g_strdup_printf (_("%s — Sound Recorder"), utf8_name);
-      gtk_window_set_title (GTK_WINDOW (window), title);
-      g_free (title);
-      g_free (utf8_name);
-      g_free (short_name);
+        priv->has_file = FALSE;
 
       set_action_sensitive (window, "Play",
-          window->priv->has_file ? TRUE : FALSE);
+          priv->has_file ? TRUE : FALSE);
       set_action_sensitive (window, "Stop", FALSE);
       set_action_sensitive (window, "Record", TRUE);
       break;
@@ -1155,30 +1133,16 @@ gsr_window_get_type (void)
 }
 
 GtkWidget *
-gsr_window_new (const char *filename)
+gsr_window_new (void)
 {
   GSRWindow *window;
-  char *template;
 
-  /* filename has been changed to be without extension */
-  window = g_object_new (GSR_TYPE_WINDOW,
-      "location", filename, NULL);
-  /* FIXME: check extension too */
-  window->priv->filename = g_strdup (filename);
-  if (g_file_test (filename, G_FILE_TEST_EXISTS |
-                   G_FILE_TEST_IS_REGULAR) != FALSE) {
-    window->priv->has_file = TRUE;
-    window->priv->dirty = FALSE;
-  } else
-    window->priv->has_file = FALSE;
+  window = g_object_new (GSR_TYPE_WINDOW, NULL);
 
-  template = g_strdup_printf ("gsr-record-%s-%d.XXXXXX", filename, getpid ());
-  window->priv->record_fd = g_file_open_tmp (template,
-      &window->priv->record_filename, NULL);
-  g_free (template);
-  close (window->priv->record_fd);
+  window->priv->has_file = FALSE;
 
   gtk_window_set_default_size (GTK_WINDOW (window), 512, 200);
+  gtk_window_set_title (GTK_WINDOW (window), "Sound Recorder");
 
   return GTK_WIDGET (window);
 }

@@ -78,9 +78,8 @@ GtkWidget *
 gsr_open_window (const char *filename)
 {
   GtkWidget *window;
-  gchar *name = "Gnome Sound Recorder";
 
-  window = GTK_WIDGET (gsr_window_new (name));
+  window = GTK_WIDGET (gsr_window_new ());
 
   g_signal_connect (G_OBJECT (window), "delete-event",
       G_CALLBACK (delete_event_cb), NULL);

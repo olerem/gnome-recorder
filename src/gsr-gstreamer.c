@@ -432,7 +432,7 @@ gsr_set_tags (GSRWindow *window)
   taglist = gst_tag_list_new (
       GST_TAG_APPLICATION_NAME, "gnome-sound-recorder",
       GST_TAG_DATE_TIME, gst_datetime,
-      GST_TAG_TITLE, priv->filename,
+      GST_TAG_TITLE, priv->record_filename,
       GST_TAG_KEYWORDS, "gnome-sound-recorder", NULL);
 
   active_pad = gst_element_get_static_pad (priv->record->src, "src");
@@ -524,17 +524,14 @@ static gboolean
 record_start (gpointer user_data) 
 {
   GSRWindow *window = GSR_WINDOW (user_data);
-  gchar *title;
+  gchar *basename;
 
   g_assert (window->priv->tick_id == 0);
 
+  basename = g_path_get_basename (window->priv->record_filename);
   gtk_label_set_text (GTK_LABEL (window->priv->name_label),
-      window->priv->filename);
-  title = g_strdup_printf (_("%s — Sound Recorder"),
-      window->priv->filename);
-  gtk_window_set_title (GTK_WINDOW (window), title);
-
-  g_free (title);
+      basename);
+  g_free (basename);
 
   window->priv->get_length_attempts = 16;
   window->priv->tick_id = g_timeout_add (200, (GSourceFunc) record_tick_callback, window);
@@ -576,8 +573,6 @@ record_state_changed_cb (GstBus *bus, GstMessage *msg, GSRWindow *window)
   switch (new_state) {
     case GST_STATE_PLAYING:
       window->priv->record_id = g_idle_add (record_start, window);
-      g_free (window->priv->extension);
-      window->priv->extension = g_strdup ("ogg");
       break;
     case GST_STATE_READY:
       gtk_adjustment_set_value (gtk_range_get_adjustment (GTK_RANGE (window->priv->scale)), 0.0);

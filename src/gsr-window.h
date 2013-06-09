@@ -70,9 +70,6 @@ struct _GSRWindowPrivate {
   char *record_filename;
   gchar *audio_path;
   char *filename;
-  char *extension;
-
-  int record_fd;
 
   /* File info */
   int len_secs; /* In seconds */
@@ -119,7 +116,7 @@ struct _GSRWindowClass {
 
 GType		gsr_window_get_type		(void);
 
-GtkWidget*	gsr_window_new			(const char *filename);
+GtkWidget*	gsr_window_new			(void);
 void		gsr_window_close		(GSRWindow *window);
 gboolean	gsr_discard_confirmation_dialog	(GSRWindow *window, gboolean closing);
 
