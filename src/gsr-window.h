@@ -67,7 +67,8 @@ struct _GSRWindowPrivate {
   /* Pipelines */
   GSRWindowPipeline *play;
   GSRWindowPipeline *record;
-  char *record_filename;
+  gchar *record_filename;
+  gchar *basename;
   gchar *audio_path;
   char *filename;
 

@@ -39,11 +39,11 @@ gsr_set_audio_path (GSRWindowPrivate *priv)
 void
 gsr_filename_from_datetime (GSRWindowPrivate *priv)
 {
-  gchar *filename;
-
+  g_free (priv->basename);
   /* we support only ogg. No need to bother about different file extensions */
-  filename = g_date_time_format (priv->datetime, "%Y-%m-%d-%H%M%S.ogg");
+  priv->basename = g_date_time_format (priv->datetime, "%Y-%m-%d-%H%M%S.ogg");
 
   g_free (priv->record_filename);
-  priv->record_filename = g_build_filename (priv->audio_path, filename, NULL);
+  priv->record_filename = g_build_filename (priv->audio_path,
+      priv->basename, NULL);
 }

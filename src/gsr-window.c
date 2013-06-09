@@ -337,7 +337,6 @@ fill_in_information (GSRWindow *window,
   struct stat buf;
   guint64 file_size = 0;
   gchar *text, *name;
-  gchar *utf8_name = NULL;
   gint n_channels, bitrate, samplerate;
 
   name = g_path_get_dirname (window->priv->record_filename);
@@ -347,15 +346,8 @@ fill_in_information (GSRWindow *window,
   g_free (name);
 
   /* filename */
-  name = g_path_get_basename (window->priv->record_filename);
-  utf8_name = g_filename_to_utf8 (name, -1, NULL, NULL, NULL);
-  text = g_strdup (utf8_name);
+  gtk_label_set_text (GTK_LABEL (fp->filename), window->priv->basename);
 
-  gtk_label_set_text (GTK_LABEL (fp->filename), text);
-  g_free (text);
-  g_free (utf8_name);
-  g_free (name);
-	
   /* Size */
   if (stat (window->priv->record_filename, &buf) == 0) {
     gchar *human;
@@ -441,11 +433,9 @@ file_properties_cb (GtkAction *action,
 		    GSRWindow *window)
 {
   GtkWidget *dialog, *vbox, *inner_vbox, *hbox, *table, *label;
-  char *title, *shortname;
+  char *title;
   struct _file_props *fp;
-  shortname = g_path_get_basename (window->priv->record_filename);
-  title = g_strdup_printf (_("%s Information"), shortname);
-  g_free (shortname);
+  title = g_strdup_printf (_("%s Information"), window->priv->basename);
 
   dialog = gtk_dialog_new_with_buttons (title, GTK_WINDOW (window),
       GTK_DIALOG_DESTROY_WITH_PARENT, GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE, NULL);

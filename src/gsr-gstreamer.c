@@ -432,7 +432,7 @@ gsr_set_tags (GSRWindow *window)
   taglist = gst_tag_list_new (
       GST_TAG_APPLICATION_NAME, "gnome-sound-recorder",
       GST_TAG_DATE_TIME, gst_datetime,
-      GST_TAG_TITLE, priv->record_filename,
+      GST_TAG_TITLE, priv->basename,
       GST_TAG_KEYWORDS, "gnome-sound-recorder", NULL);
 
   active_pad = gst_element_get_static_pad (priv->record->src, "src");
@@ -725,7 +725,7 @@ record_cb (GtkAction *action,
     gsr_generate_datetime (priv);
     gsr_filename_from_datetime (priv);
 
-    g_print ("%s", priv->record_filename);
+    g_print ("%s\n", priv->record_filename);
     g_object_set (G_OBJECT (priv->record->sink),
         "location", priv->record_filename, NULL);
 
