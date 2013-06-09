@@ -98,16 +98,6 @@ int
 main (int argc,
       char **argv)
 {
-  gchar **filenames = NULL;
-  /* this is necessary because someone apparently forgot to add a
-   * convenient way to get the remaining arguments to the GnomeProgram
-   * API when adding the GOption stuff to it ... */
-  const GOptionEntry entries[] = {
-    { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &filenames,
-    "Special option that collects any remaining arguments for us" },
-    { NULL, }
-  };
-
   GOptionContext *ctx;
   GError *error = NULL;
 
@@ -120,7 +110,6 @@ main (int argc,
   /* Initializes gtk during option parsing */
   g_option_context_add_group (ctx, gtk_get_option_group (TRUE));
   g_option_context_add_group (ctx, gst_init_get_option_group ());
-  g_option_context_add_main_entries (ctx, entries, GETTEXT_PACKAGE);
 
   if (!g_option_context_parse (ctx, &argc, &argv, &error)) {
     g_printerr ("Option parsing failed: %s\n", error->message);
@@ -133,19 +122,7 @@ main (int argc,
   gtk_window_set_default_icon_name ("gnome-sound-recorder");
   g_setenv ("PULSE_PROP_media.role", "production", TRUE);
 
-  if (filenames != NULL && filenames[0] != NULL) {
-    guint i, num;
-
-    num = g_strv_length (filenames);
-
-    for (i = 0; i < num; ++i)
-      gsr_open_window (filenames[i]);
-
-  } else
-    gsr_open_window (NULL);
-
-  if (filenames)
-    g_strfreev (filenames);
+  gsr_open_window (NULL);
 
   gtk_main ();
 
